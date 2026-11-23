@@ -56,8 +56,10 @@ jobs:
       - name: Run Rust tests
         run: cargo test --all-features
 
+  # Task PRs into a feature branch skip this; it runs only on the way into main.
   build:
-    name: Build check on ${{ matrix.platform }}
+    name: Build check on ${{ matrix.platform }} ${{ matrix.target }}
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
     needs: [frontend, rust]
     strategy:
       fail-fast: false

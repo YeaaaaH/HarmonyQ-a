@@ -2,7 +2,7 @@
 
 Two GitHub Actions workflows:
 
-- [`ci.yml`](../.github/workflows/ci.yml) runs on every PR and push to `main`: frontend build, `cargo fmt --check`, `clippy -D warnings`, `cargo test`, and a `cargo check` on Windows, Linux and macOS (Intel + Apple Silicon).
+- [`ci.yml`](../.github/workflows/ci.yml) runs on every PR and push to `main`: frontend build, `cargo fmt --check`, `clippy -D warnings`, `cargo test`. PRs into `main` and pushes to `main` also run a `cargo check` on Windows, Linux and macOS (Intel + Apple Silicon); task PRs into a feature branch skip it.
 - [`release.yml`](../.github/workflows/release.yml) runs on a pushed `v*.*.*` tag and builds installers with [`tauri-action`](https://github.com/tauri-apps/tauri-action) into a **draft** GitHub Release.
 
 | OS | Installer |
