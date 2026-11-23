@@ -19,7 +19,7 @@ You get a summary of what changed and why. Use it for the PR description. Don't 
 2. Run in parallel: `git status`, `git diff`, `git diff --staged`, `git log --oneline -10`, `git branch --show-current`.
 3. Decide whether the changes are one cohesive change or several unrelated ones. Prefer fewer commits; split only unrelated concerns. All commits of one invocation go to the same branch and PR.
 4. **Branch and PR base** — decided by the current branch:
-   - `task/*` or `bug/*`: reuse it; its PR already exists or targets the base it was created from.
+   - `task/*` or `bug/*`: reuse it. If its PR exists, the base is that PR's base. If not, the base is the first `origin/feature/*` that is an ancestor of `HEAD` (`git merge-base --is-ancestor origin/feature/<f> HEAD`), else `main`.
    - `feature/<f>` or `main`: `git pull`, then `git checkout -b <prefix>/<slug>` off it. The PR base is that branch (`feature/<f>` or `main`).
      - `<prefix>`: `bug` (broken behavior) or `task` (everything else). Never create `feature/` branches here; that's the `/feature` skill.
      - `<slug>`: 2-5 words, kebab-case, e.g. `task/routines-migration`.
