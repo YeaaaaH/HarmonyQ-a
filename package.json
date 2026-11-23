@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ui:add": "node scripts/ui-add.mjs"
   },
   "dependencies": {
     "@fontsource-variable/sora": "^5.3.0",

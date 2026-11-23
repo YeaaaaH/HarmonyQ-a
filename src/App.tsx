@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AddItemForm } from "@/components/AddItemForm";
 import { ItemList } from "@/components/ItemList";
+import { TaskEditor } from "@/components/TaskEditor";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { VIEWS, type View } from "@/components/shell/views";
 import { useItems } from "@/hooks/useItems";
@@ -9,7 +10,9 @@ import { useSystemTheme } from "@/hooks/useSystemTheme";
 export default function App() {
   useSystemTheme();
   const [view, setView] = useState<View>("all");
-  const { items, error, add, toggle, remove } = useItems();
+  const { items, error, clearError, add, update, toggle, remove } = useItems();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = items.find((i) => i.id === editingId) ?? null;
   const openCount = items.filter((i) => i.status === "open").length;
   const title = VIEWS.find((v) => v.id === view)?.label;
 
@@ -22,8 +25,16 @@ export default function App() {
           {view === "all" ? (
             <>
               <AddItemForm onAdd={add} />
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <ItemList items={items} onToggle={toggle} onRemove={remove} />
+              {error && !editing && <p className="text-sm text-destructive">{error}</p>}
+              <ItemList
+                items={items}
+                onOpen={(item) => {
+                  clearError();
+                  setEditingId(item.id);
+                }}
+                onToggle={toggle}
+                onRemove={remove}
+              />
             </>
           ) : (
             <p className="py-8 text-center text-muted-foreground">
@@ -32,6 +43,12 @@ export default function App() {
           )}
         </div>
       </main>
+      <TaskEditor
+        item={editing}
+        error={error}
+        onSave={update}
+        onClose={() => setEditingId(null)}
+      />
     </div>
   );
 }
