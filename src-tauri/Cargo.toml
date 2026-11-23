@@ -19,3 +19,4 @@ serde = { version = "1", features = ["derive"] }
 rusqlite = { version = "0.43", features = ["bundled"] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }

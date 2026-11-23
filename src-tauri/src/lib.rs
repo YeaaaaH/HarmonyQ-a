@@ -20,6 +20,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::items::list_items,
             commands::items::create_item,
+            commands::items::update_item,
             commands::items::set_item_status,
             commands::items::delete_item,
         ])
