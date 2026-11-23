@@ -31,7 +31,7 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 - [x] App shell: sidebar + main area, theme follows the OS
 - [x] Migration + model: due date, time, note, priority; edit command
 - [x] Task editor: date, time, note, priority
-- [ ] Today view: overdue (carried over, marked) + today, sorted by time and priority
+- [x] Today view: overdue (carried over, marked) + today, sorted by time and priority
 - [ ] Reminders: OS notification at the task's time while the app runs
 
 ### Item types (`feature/item-types`)

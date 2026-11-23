@@ -6,12 +6,14 @@ import type { Item } from "@/types/item";
 
 interface Props {
   items: Item[];
+  /** Marks the dates as overdue. */
+  overdue?: boolean;
   onOpen: (item: Item) => void;
   onToggle: (item: Item) => void;
   onRemove: (id: string) => void;
 }
 
-export function ItemList({ items, onOpen, onToggle, onRemove }: Props) {
+export function ItemList({ items, overdue = false, onOpen, onToggle, onRemove }: Props) {
   if (items.length === 0) {
     return <p className="py-8 text-center text-muted-foreground">Nothing here yet.</p>;
   }
@@ -32,7 +34,7 @@ export function ItemList({ items, onOpen, onToggle, onRemove }: Props) {
               >
                 {item.title}
               </span>
-              <ItemMeta item={item} />
+              <ItemMeta item={item} overdue={overdue} />
             </button>
             <Button
               variant="ghost"
@@ -50,14 +52,14 @@ export function ItemList({ items, onOpen, onToggle, onRemove }: Props) {
   );
 }
 
-function ItemMeta({ item }: { item: Item }) {
+function ItemMeta({ item, overdue }: { item: Item; overdue: boolean }) {
   const high = item.priority === "high";
   if (!item.dueDate && !item.note && !high) return null;
 
   return (
     <span className="flex items-center gap-3 text-xs text-muted-foreground [&_svg]:size-3.5">
       {item.dueDate && (
-        <span className="flex items-center gap-1">
+        <span className={cn("flex items-center gap-1", overdue && "text-destructive")}>
           <CalendarDays />
           {formatDate(item.dueDate)}
         </span>

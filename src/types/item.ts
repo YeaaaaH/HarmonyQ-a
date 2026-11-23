@@ -23,3 +23,10 @@ export interface ItemDetails {
   note: string;
   priority: Priority;
 }
+
+export interface TodayView {
+  /** Local date the view was built for, `YYYY-MM-DD`. */
+  date: string;
+  overdue: Item[];
+  today: Item[];
+}

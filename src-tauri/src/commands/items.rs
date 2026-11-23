@@ -2,12 +2,17 @@ use tauri::State;
 
 use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
 use crate::error::AppError;
-use crate::models::item::{Item, ItemStatus};
+use crate::models::item::{Item, ItemStatus, TodayView};
 use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_items(state: State<'_, AppState>) -> Result<Vec<Item>, AppError> {
     state.items.list()
+}
+
+#[tauri::command]
+pub async fn list_today(state: State<'_, AppState>) -> Result<TodayView, AppError> {
+    state.items.today(chrono::Local::now().date_naive())
 }
 
 #[tauri::command]
