@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import * as api from "../lib/api/items";
-import type { Item } from "../types/item";
+import * as api from "@/lib/api/items";
+import type { Item } from "@/types/item";
 
 export function useItems() {
   const [items, setItems] = useState<Item[]>([]);

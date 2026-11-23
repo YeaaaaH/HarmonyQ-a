@@ -1,16 +1,37 @@
+import { useState } from "react";
 import { AddItemForm } from "@/components/AddItemForm";
 import { ItemList } from "@/components/ItemList";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { VIEWS, type View } from "@/components/shell/views";
 import { useItems } from "@/hooks/useItems";
+import { useSystemTheme } from "@/hooks/useSystemTheme";
 
 export default function App() {
+  useSystemTheme();
+  const [view, setView] = useState<View>("all");
   const { items, error, add, toggle, remove } = useItems();
+  const openCount = items.filter((i) => i.status === "open").length;
+  const title = VIEWS.find((v) => v.id === view)?.label;
 
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-4 p-6">
-      <h1 className="text-2xl font-semibold">HarmonyQ'a</h1>
-      <AddItemForm onAdd={add} />
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <ItemList items={items} onToggle={toggle} onRemove={remove} />
-    </main>
+    <div className="flex h-screen">
+      <Sidebar active={view} counts={{ all: openCount }} onSelect={setView} />
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          {view === "all" ? (
+            <>
+              <AddItemForm onAdd={add} />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <ItemList items={items} onToggle={toggle} onRemove={remove} />
+            </>
+          ) : (
+            <p className="py-8 text-center text-muted-foreground">
+              Tasks planned for today will show up here once tasks have dates.
+            </p>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
