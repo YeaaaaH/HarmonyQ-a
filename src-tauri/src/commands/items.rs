@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::dto::item::CreateItemRequest;
+use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
 use crate::error::AppError;
 use crate::models::item::{Item, ItemStatus};
 use crate::state::AppState;
@@ -16,6 +16,15 @@ pub async fn create_item(
     request: CreateItemRequest,
 ) -> Result<Item, AppError> {
     state.items.create(request)
+}
+
+#[tauri::command]
+pub async fn update_item(
+    state: State<'_, AppState>,
+    id: String,
+    request: UpdateItemRequest,
+) -> Result<Item, AppError> {
+    state.items.update(&id, request)
 }
 
 #[tauri::command]

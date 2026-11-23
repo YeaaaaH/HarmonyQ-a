@@ -30,7 +30,9 @@ Dependencies point one way: commands -> services -> repositories -> db. `lib.rs`
 
 - One SQLite file in the app data dir (`%APPDATA%\harmonyq-a\harmonyq-a.db` on Windows).
 - **Migrations are append-only.** Add a new `NNNN_name.sql` and list it in `db/migrations.rs`; never edit a released one. Applied count is stored in `PRAGMA user_version`.
-- Timestamps are Unix milliseconds in UTC (`i64`).
+- Timestamps (`created_at`, `updated_at`) are Unix milliseconds in UTC (`i64`).
+- Planned dates are local, not UTC: `due_date` is a calendar day `YYYY-MM-DD`, `due_time` a wall-clock `HH:MM`. A task "for Tuesday" stays on Tuesday in any time zone. Parsed and normalised with `chrono` in the service.
+- Enum columns (`status`, `priority`) are stored as lowercase text.
 - Ids are UUID v4 strings.
 
 ## Rust <-> TypeScript contract
