@@ -30,6 +30,6 @@ Code explains itself through naming and structure. Comment only a non-obvious wh
 
 ## Git
 
-`main` is the default branch. Early steps may be committed directly; move to feature branches + PRs once CI exists.
+`main` is the default branch. Work goes on a `feature/`, `bug/` or `task/` branch and lands via PR once CI (`.github/workflows/ci.yml`) is green. Use the `commit` skill (`/commit`): it delegates to the `committer` subagent (`.claude/agents/committer.md`), which branches, commits, pushes and opens the PR. Releases use the `release` skill (`/release`), the only flow that commits to `main` directly; see `docs/releasing.md`.
 
 Commit message: one line, `HQ-NNN` + at most 7 words briefly saying what changed (e.g. `HQ-002 Add routines table and service`). NNN is the next number after the last commit's, zero-padded to 3 digits. No body, no trailers.
