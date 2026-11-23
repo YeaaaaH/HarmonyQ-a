@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Item, ItemDetails, ItemStatus } from "@/types/item";
+import type { Item, ItemDetails, ItemStatus, TodayView } from "@/types/item";
 
 export const listItems = () => invoke<Item[]>("list_items");
+
+export const listToday = () => invoke<TodayView>("list_today");
 
 export const createItem = (title: string, dueDate: string | null = null) =>
   invoke<Item>("create_item", { request: { title, dueDate } });

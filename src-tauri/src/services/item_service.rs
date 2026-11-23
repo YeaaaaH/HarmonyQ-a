@@ -1,9 +1,11 @@
+use std::cmp::Ordering;
+
 use chrono::{NaiveDate, NaiveTime};
 
 use crate::db::Db;
 use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
 use crate::error::{AppError, AppResult};
-use crate::models::item::{Item, ItemStatus, Priority};
+use crate::models::item::{Item, ItemStatus, Priority, TodayView};
 use crate::repositories::item_repo::ItemRepository;
 use crate::utils::{id::new_id, time::now_ms};
 
@@ -22,6 +24,23 @@ impl ItemService {
     pub fn list(&self) -> AppResult<Vec<Item>> {
         let conn = self.db.lock()?;
         ItemRepository::list(&conn)
+    }
+
+    /// `today` is passed in rather than read from the clock so the rules are testable.
+    pub fn today(&self, today: NaiveDate) -> AppResult<TodayView> {
+        let date = today.format("%Y-%m-%d").to_string();
+        let conn = self.db.lock()?;
+        let (mut overdue, mut today): (Vec<_>, Vec<_>) = ItemRepository::list_due_by(&conn, &date)?
+            .into_iter()
+            .partition(|item| item.due_date.as_deref() != Some(date.as_str()));
+
+        overdue.sort_by(day_order);
+        today.sort_by(day_order);
+        Ok(TodayView {
+            date,
+            overdue,
+            today,
+        })
     }
 
     pub fn create(&self, request: CreateItemRequest) -> AppResult<Item> {
@@ -90,6 +109,21 @@ impl ItemService {
         }
         Ok(())
     }
+}
+
+/// Open before done, then earlier day, timed before untimed by time, important first, oldest first.
+fn day_order(a: &Item, b: &Item) -> Ordering {
+    let key = |item: &Item| {
+        (
+            item.status == ItemStatus::Done,
+            item.due_date.clone(),
+            item.due_time.is_none(),
+            item.due_time.clone(),
+            item.priority != Priority::High,
+            item.created_at,
+        )
+    };
+    key(a).cmp(&key(b))
 }
 
 fn validate_title(title: &str) -> AppResult<String> {
@@ -263,6 +297,122 @@ mod tests {
     fn update_missing_item_is_not_found() {
         let err = service().update("nope", details("task")).unwrap_err();
         assert!(matches!(err, AppError::NotFound(_)));
+    }
+
+    fn day(date: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap()
+    }
+
+    fn planned(
+        service: &ItemService,
+        title: &str,
+        date: Option<&str>,
+        time: Option<&str>,
+        priority: Priority,
+    ) -> Item {
+        let item = service.create(request(title)).unwrap();
+        service
+            .update(
+                &item.id,
+                UpdateItemRequest {
+                    title: title.into(),
+                    due_date: date.map(Into::into),
+                    due_time: time.map(Into::into),
+                    note: String::new(),
+                    priority,
+                },
+            )
+            .unwrap()
+    }
+
+    fn titles(items: &[Item]) -> Vec<&str> {
+        items.iter().map(|i| i.title.as_str()).collect()
+    }
+
+    #[test]
+    fn today_splits_overdue_and_today_and_skips_the_rest() {
+        let service = service();
+        planned(
+            &service,
+            "yesterday",
+            Some("2026-11-22"),
+            None,
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "today",
+            Some("2026-11-23"),
+            None,
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "tomorrow",
+            Some("2026-11-24"),
+            None,
+            Priority::Normal,
+        );
+        planned(&service, "undated", None, None, Priority::Normal);
+        let done_old = planned(
+            &service,
+            "done long ago",
+            Some("2026-11-01"),
+            None,
+            Priority::Normal,
+        );
+        service.set_status(&done_old.id, ItemStatus::Done).unwrap();
+
+        let view = service.today(day("2026-11-23")).unwrap();
+        assert_eq!(view.date, "2026-11-23");
+        assert_eq!(titles(&view.overdue), ["yesterday"]);
+        assert_eq!(titles(&view.today), ["today"]);
+    }
+
+    #[test]
+    fn today_orders_by_time_then_priority_with_done_last() {
+        let service = service();
+        let date = Some("2026-11-23");
+        let done = planned(&service, "done", date, Some("07:00"), Priority::High);
+        service.set_status(&done.id, ItemStatus::Done).unwrap();
+        planned(&service, "untimed normal", date, None, Priority::Normal);
+        planned(&service, "untimed important", date, None, Priority::High);
+        planned(&service, "at 14:00", date, Some("14:00"), Priority::Normal);
+        planned(&service, "at 09:00", date, Some("09:00"), Priority::Normal);
+
+        let view = service.today(day("2026-11-23")).unwrap();
+        assert_eq!(
+            titles(&view.today),
+            [
+                "at 09:00",
+                "at 14:00",
+                "untimed important",
+                "untimed normal",
+                "done"
+            ]
+        );
+    }
+
+    #[test]
+    fn today_orders_overdue_oldest_first() {
+        let service = service();
+        planned(
+            &service,
+            "two days ago",
+            Some("2026-11-21"),
+            None,
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "last week",
+            Some("2026-11-16"),
+            None,
+            Priority::Normal,
+        );
+
+        let view = service.today(day("2026-11-23")).unwrap();
+        assert_eq!(titles(&view.overdue), ["last week", "two days ago"]);
     }
 
     #[test]

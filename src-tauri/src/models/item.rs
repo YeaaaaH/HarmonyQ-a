@@ -51,6 +51,17 @@ impl Priority {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TodayView {
+    /// The local date the view was built for, `YYYY-MM-DD`.
+    pub date: String,
+    /// Open tasks from earlier days.
+    pub overdue: Vec<Item>,
+    /// Tasks for `date`, open ones first.
+    pub today: Vec<Item>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Item {
     pub id: String,
     pub title: String,

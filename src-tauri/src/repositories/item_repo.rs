@@ -19,6 +19,18 @@ impl ItemRepository {
         Ok(items)
     }
 
+    /// Open tasks due on or before `date`, plus every task due exactly on `date`.
+    pub fn list_due_by(conn: &Connection, date: &str) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items
+             WHERE due_date = ?1 OR (status = 'open' AND due_date < ?1)"
+        ))?;
+        let items = stmt
+            .query_map(params![date], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
     pub fn find(conn: &Connection, id: &str) -> AppResult<Option<Item>> {
         let item = conn
             .query_row(
