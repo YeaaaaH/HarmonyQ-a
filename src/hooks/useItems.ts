@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import * as api from "../lib/api/items";
-import type { Item } from "../types/item";
+import * as api from "@/lib/api/items";
+import type { Item, ItemDetails } from "@/types/item";
 
 export function useItems() {
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const run = useCallback(async (action: () => Promise<void>) => {
+  const run = useCallback(async (action: () => Promise<void>): Promise<boolean> => {
     try {
       setError(null);
       await action();
+      return true;
     } catch (e) {
       setError(String(e));
+      return false;
     }
   }, []);
 
@@ -19,17 +21,22 @@ export function useItems() {
     run(async () => setItems(await api.listItems()));
   }, [run]);
 
-  const add = (title: string) =>
+  const replace = (updated: Item) =>
+    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+
+  const add = (title: string, dueDate: string | null = null) =>
     run(async () => {
-      const created = await api.createItem(title);
+      const created = await api.createItem(title, dueDate);
       setItems((prev) => [created, ...prev]);
     });
+
+  const update = (id: string, details: ItemDetails) =>
+    run(async () => replace(await api.updateItem(id, details)));
 
   const toggle = (item: Item) =>
     run(async () => {
       const next = item.status === "open" ? "done" : "open";
-      const updated = await api.setItemStatus(item.id, next);
-      setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+      replace(await api.setItemStatus(item.id, next));
     });
 
   const remove = (id: string) =>
@@ -38,5 +45,5 @@ export function useItems() {
       setItems((prev) => prev.filter((i) => i.id !== id));
     });
 
-  return { items, error, add, toggle, remove };
+  return { items, error, clearError: () => setError(null), add, update, toggle, remove };
 }

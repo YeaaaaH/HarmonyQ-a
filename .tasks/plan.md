@@ -19,18 +19,24 @@ Reference: cURLyQ (`.github/workflows/`, `docs/releasing.md`).
 - [x] First green CI run
 - [x] Feature branches: task PRs skip the per-OS build check
 - [ ] First draft release `v0.1.0`
-- [ ] Real app icon (`npx tauri icon`)
+- [x] Real app icon (`npx tauri icon`, source `src-tauri/icons/app-icon.svg`)
 
 ## Step 2 - Daily use
 UI: shadcn/ui + lucide + theme tokens, same conventions as cURLyQ. Layout: sidebar (Today, Routines, Tasks, Ideas, Promises, Settings) + main list with quick-add.
 Each `###` below is one feature branch (`/feature start <slug>`); each checkbox is roughly one task PR.
 
-### Layout (`feature/layout`)
-- [ ] shadcn/ui setup, theme tokens
-- [ ] Sidebar + main area
+### Daily tasks (`feature/daily-tasks`)
+One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive with their features).
+- [x] shadcn/ui setup, theme tokens
+- [x] App shell: sidebar + main area, theme follows the OS
+- [x] Migration + model: due date, time, note, priority; edit command
+- [x] Task editor: date, time, note, priority
+- [x] Today view: overdue (carried over, marked) + today, sorted by time and priority
+- [x] Reminders: OS notification at the task's time while the app runs (and hidden in the tray)
+- [x] Tray: closing the window hides the app to the tray; single instance
 
 ### Item types (`feature/item-types`)
-- [ ] Migration: type, who, due date
+- [ ] Migration: type, who (due date comes from daily tasks)
 - [ ] Type picker in quick-add, per-type lists
 
 ### Routines (`feature/routines`)
@@ -38,11 +44,11 @@ Each `###` below is one feature branch (`/feature start <slug>`); each checkbox 
 - [ ] Service: schedule, check/uncheck for a day
 - [ ] Routines screen
 
-### Today (`feature/today`)
-- [ ] Today view: routines for today, tasks due today, promises due soon
+### Today+ (`feature/today-plus`)
+- [ ] Today view also shows routines and promises due soon
 
 ### Search (`feature/search`)
 - [ ] SQLite FTS5 index + search box
 
 ## Later (only if daily use demands it)
-Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), reminders, weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.
+Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.

@@ -1,9 +1,10 @@
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::AppResult;
-use crate::models::item::{Item, ItemStatus};
+use crate::models::item::{Item, ItemStatus, Priority};
 
-const COLUMNS: &str = "id, title, status, created_at, updated_at";
+const COLUMNS: &str =
+    "id, title, status, due_date, due_time, note, priority, created_at, updated_at";
 
 pub struct ItemRepository;
 
@@ -16,6 +17,43 @@ impl ItemRepository {
             .query_map([], map_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(items)
+    }
+
+    /// Open tasks due on or before `date`, plus every task due exactly on `date`.
+    pub fn list_due_by(conn: &Connection, date: &str) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items
+             WHERE due_date = ?1 OR (status = 'open' AND due_date < ?1)"
+        ))?;
+        let items = stmt
+            .query_map(params![date], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    /// Open tasks due on `date` at or before `time` that have not been reminded yet.
+    pub fn list_pending_reminders(
+        conn: &Connection,
+        date: &str,
+        time: &str,
+    ) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items
+             WHERE status = 'open' AND due_date = ?1 AND due_time <= ?2 AND reminded_at IS NULL
+             ORDER BY due_time"
+        ))?;
+        let items = stmt
+            .query_map(params![date, time], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    pub fn mark_reminded(conn: &Connection, id: &str, reminded_at: i64) -> AppResult<()> {
+        conn.execute(
+            "UPDATE items SET reminded_at = ?1 WHERE id = ?2",
+            params![reminded_at, id],
+        )?;
+        Ok(())
     }
 
     pub fn find(conn: &Connection, id: &str) -> AppResult<Option<Item>> {
@@ -31,17 +69,39 @@ impl ItemRepository {
 
     pub fn insert(conn: &Connection, item: &Item) -> AppResult<()> {
         conn.execute(
-            "INSERT INTO items (id, title, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            &format!("INSERT INTO items ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"),
             params![
                 item.id,
                 item.title,
                 item.status.as_str(),
+                item.due_date,
+                item.due_time,
+                item.note,
+                item.priority.as_str(),
                 item.created_at,
                 item.updated_at
             ],
         )?;
         Ok(())
+    }
+
+    pub fn update_details(conn: &Connection, item: &Item) -> AppResult<usize> {
+        let changed = conn.execute(
+            "UPDATE items
+             SET title = ?1, due_date = ?2, due_time = ?3, note = ?4, priority = ?5, updated_at = ?6,
+                 reminded_at = CASE WHEN due_date IS ?2 AND due_time IS ?3 THEN reminded_at END
+             WHERE id = ?7",
+            params![
+                item.title,
+                item.due_date,
+                item.due_time,
+                item.note,
+                item.priority.as_str(),
+                item.updated_at,
+                item.id
+            ],
+        )?;
+        Ok(changed)
     }
 
     pub fn update_status(
@@ -65,19 +125,28 @@ impl ItemRepository {
 
 fn map_row(row: &Row) -> rusqlite::Result<Item> {
     let status: String = row.get("status")?;
-    let status = ItemStatus::parse(&status).ok_or_else(|| {
-        rusqlite::Error::FromSqlConversionFailure(
-            2,
-            rusqlite::types::Type::Text,
-            format!("unknown item status: {status}").into(),
-        )
-    })?;
+    let status = ItemStatus::parse(&status).ok_or_else(|| unknown_value("status", &status))?;
+    let priority: String = row.get("priority")?;
+    let priority =
+        Priority::parse(&priority).ok_or_else(|| unknown_value("priority", &priority))?;
 
     Ok(Item {
         id: row.get("id")?,
         title: row.get("title")?,
         status,
+        due_date: row.get("due_date")?,
+        due_time: row.get("due_time")?,
+        note: row.get("note")?,
+        priority,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })
+}
+
+fn unknown_value(column: &str, value: &str) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(
+        0,
+        rusqlite::types::Type::Text,
+        format!("unknown item {column}: {value}").into(),
+    )
 }

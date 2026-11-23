@@ -14,8 +14,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 rusqlite = { version = "0.43", features = ["bundled"] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+tauri-plugin-notification = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
