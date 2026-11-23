@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface Props {
-  onAdd: (title: string) => Promise<void>;
+  onAdd: (title: string) => Promise<boolean>;
 }
 
 export function AddItemForm({ onAdd }: Props) {
@@ -13,8 +13,7 @@ export function AddItemForm({ onAdd }: Props) {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
-    await onAdd(title);
-    setTitle("");
+    if (await onAdd(title)) setTitle("");
   };
 
   return (
