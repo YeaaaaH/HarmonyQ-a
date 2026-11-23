@@ -28,7 +28,7 @@ Each `###` below is one feature branch (`/feature start <slug>`); each checkbox 
 ### Daily tasks (`feature/daily-tasks`)
 One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive with their features).
 - [x] shadcn/ui setup, theme tokens
-- [ ] App shell: sidebar + main area, theme follows the OS
+- [x] App shell: sidebar + main area, theme follows the OS
 - [ ] Migration + model: due date, time, note, priority; edit command
 - [ ] Task editor: date, time, note, priority
 - [ ] Today view: overdue (carried over, marked) + today, sorted by time and priority
