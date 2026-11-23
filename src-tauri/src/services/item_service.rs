@@ -98,7 +98,12 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(2));
         service.create(request("second")).unwrap();
 
-        let titles: Vec<_> = service.list().unwrap().into_iter().map(|i| i.title).collect();
+        let titles: Vec<_> = service
+            .list()
+            .unwrap()
+            .into_iter()
+            .map(|i| i.title)
+            .collect();
         assert_eq!(titles, ["second", "first"]);
     }
 
@@ -118,6 +123,9 @@ mod tests {
 
         service.delete(&item.id).unwrap();
         assert!(service.list().unwrap().is_empty());
-        assert!(matches!(service.delete(&item.id), Err(AppError::NotFound(_))));
+        assert!(matches!(
+            service.delete(&item.id),
+            Err(AppError::NotFound(_))
+        ));
     }
 }
