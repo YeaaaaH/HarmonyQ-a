@@ -7,6 +7,7 @@ use crate::error::AppResult;
 const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_create_items.sql"),
     include_str!("migrations/0002_add_item_details.sql"),
+    include_str!("migrations/0003_add_reminded_at.sql"),
 ];
 
 pub fn run(conn: &mut Connection) -> AppResult<()> {

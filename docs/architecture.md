@@ -22,6 +22,8 @@ flowchart LR
 | `dto/` | Input types for the IPC boundary | |
 | `error.rs` | `AppError`; serialised to the UI as a message string | |
 | `state.rs` | `AppState` holding the services, managed by Tauri | |
+| `tray.rs` | Tray icon and menu; closing the main window hides it to the tray | |
+| `reminders.rs` | Background loop that shows OS notifications for due tasks | |
 | `utils/` | Small helpers (ids, time) | |
 
 Dependencies point one way: commands -> services -> repositories -> db. `lib.rs` wires everything up and registers commands.
@@ -33,6 +35,7 @@ Dependencies point one way: commands -> services -> repositories -> db. `lib.rs`
 - Timestamps (`created_at`, `updated_at`) are Unix milliseconds in UTC (`i64`).
 - Planned dates are local, not UTC: `due_date` is a calendar day `YYYY-MM-DD`, `due_time` a wall-clock `HH:MM`. A task "for Tuesday" stays on Tuesday in any time zone. Parsed and normalised with `chrono` in the service.
 - Enum columns (`status`, `priority`) are stored as lowercase text.
+- `reminded_at` (ms, internal, not sent to the UI) marks that the reminder for the current `due_date`/`due_time` was shown; `update_details` clears it when either changes. `reminders.rs` polls `ItemService::take_due_reminders` every 20 s while the app runs.
 - Ids are UUID v4 strings.
 
 ## Rust <-> TypeScript contract

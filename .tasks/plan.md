@@ -19,7 +19,7 @@ Reference: cURLyQ (`.github/workflows/`, `docs/releasing.md`).
 - [x] First green CI run
 - [x] Feature branches: task PRs skip the per-OS build check
 - [ ] First draft release `v0.1.0`
-- [ ] Real app icon (`npx tauri icon`)
+- [x] Real app icon (`npx tauri icon`, source `src-tauri/icons/app-icon.svg`)
 
 ## Step 2 - Daily use
 UI: shadcn/ui + lucide + theme tokens, same conventions as cURLyQ. Layout: sidebar (Today, Routines, Tasks, Ideas, Promises, Settings) + main list with quick-add.
@@ -32,7 +32,8 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 - [x] Migration + model: due date, time, note, priority; edit command
 - [x] Task editor: date, time, note, priority
 - [x] Today view: overdue (carried over, marked) + today, sorted by time and priority
-- [ ] Reminders: OS notification at the task's time while the app runs
+- [x] Reminders: OS notification at the task's time while the app runs (and hidden in the tray)
+- [x] Tray: closing the window hides the app to the tray; single instance
 
 ### Item types (`feature/item-types`)
 - [ ] Migration: type, who (due date comes from daily tasks)
@@ -50,4 +51,4 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 - [ ] SQLite FTS5 index + search box
 
 ## Later (only if daily use demands it)
-Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), reminders when the app is closed (tray), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.
+Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.

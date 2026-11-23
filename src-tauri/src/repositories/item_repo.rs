@@ -31,6 +31,31 @@ impl ItemRepository {
         Ok(items)
     }
 
+    /// Open tasks due on `date` at or before `time` that have not been reminded yet.
+    pub fn list_pending_reminders(
+        conn: &Connection,
+        date: &str,
+        time: &str,
+    ) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items
+             WHERE status = 'open' AND due_date = ?1 AND due_time <= ?2 AND reminded_at IS NULL
+             ORDER BY due_time"
+        ))?;
+        let items = stmt
+            .query_map(params![date, time], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    pub fn mark_reminded(conn: &Connection, id: &str, reminded_at: i64) -> AppResult<()> {
+        conn.execute(
+            "UPDATE items SET reminded_at = ?1 WHERE id = ?2",
+            params![reminded_at, id],
+        )?;
+        Ok(())
+    }
+
     pub fn find(conn: &Connection, id: &str) -> AppResult<Option<Item>> {
         let item = conn
             .query_row(
@@ -63,7 +88,8 @@ impl ItemRepository {
     pub fn update_details(conn: &Connection, item: &Item) -> AppResult<usize> {
         let changed = conn.execute(
             "UPDATE items
-             SET title = ?1, due_date = ?2, due_time = ?3, note = ?4, priority = ?5, updated_at = ?6
+             SET title = ?1, due_date = ?2, due_time = ?3, note = ?4, priority = ?5, updated_at = ?6,
+                 reminded_at = CASE WHEN due_date IS ?2 AND due_time IS ?3 THEN reminded_at END
              WHERE id = ?7",
             params![
                 item.title,

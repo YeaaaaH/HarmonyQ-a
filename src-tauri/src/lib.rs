@@ -3,20 +3,30 @@ mod db;
 mod dto;
 mod error;
 mod models;
+mod reminders;
 mod repositories;
 mod services;
 mod state;
+mod tray;
 mod utils;
 
 use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin: a second launch only focuses the running instance.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_main_window(app)
+        }))
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             app.manage(state::AppState::init(&data_dir)?);
+            tray::init(app.handle())?;
+            reminders::start(app.handle().clone());
             Ok(())
         })
+        .on_window_event(tray::hide_on_close)
         .invoke_handler(tauri::generate_handler![
             commands::items::list_items,
             commands::items::list_today,

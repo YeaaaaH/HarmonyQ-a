@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
 use crate::db::Db;
 use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
@@ -41,6 +41,19 @@ impl ItemService {
             overdue,
             today,
         })
+    }
+
+    /// Returns tasks whose reminder is due at `now` and marks them so each fires once.
+    pub fn take_due_reminders(&self, now: NaiveDateTime) -> AppResult<Vec<Item>> {
+        let date = now.format("%Y-%m-%d").to_string();
+        let time = now.format("%H:%M").to_string();
+        let conn = self.db.lock()?;
+        let due = ItemRepository::list_pending_reminders(&conn, &date, &time)?;
+        let reminded_at = now_ms();
+        for item in &due {
+            ItemRepository::mark_reminded(&conn, &item.id, reminded_at)?;
+        }
+        Ok(due)
     }
 
     pub fn create(&self, request: CreateItemRequest) -> AppResult<Item> {
@@ -435,5 +448,106 @@ mod tests {
             service.delete(&item.id),
             Err(AppError::NotFound(_))
         ));
+    }
+
+    fn at(date: &str, time: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(&format!("{date} {time}"), "%Y-%m-%d %H:%M").unwrap()
+    }
+
+    #[test]
+    fn reminders_fire_once_for_open_tasks_whose_time_has_come() {
+        let service = service();
+        planned(
+            &service,
+            "due",
+            Some("2026-11-23"),
+            Some("09:00"),
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "later",
+            Some("2026-11-23"),
+            Some("18:00"),
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "no time",
+            Some("2026-11-23"),
+            None,
+            Priority::Normal,
+        );
+        planned(
+            &service,
+            "yesterday",
+            Some("2026-11-22"),
+            Some("09:00"),
+            Priority::Normal,
+        );
+        let done = planned(
+            &service,
+            "done",
+            Some("2026-11-23"),
+            Some("08:00"),
+            Priority::Normal,
+        );
+        service.set_status(&done.id, ItemStatus::Done).unwrap();
+
+        let fired = service
+            .take_due_reminders(at("2026-11-23", "09:00"))
+            .unwrap();
+        assert_eq!(titles(&fired), ["due"]);
+        assert!(service
+            .take_due_reminders(at("2026-11-23", "09:01"))
+            .unwrap()
+            .is_empty());
+
+        let fired = service
+            .take_due_reminders(at("2026-11-23", "18:30"))
+            .unwrap();
+        assert_eq!(titles(&fired), ["later"]);
+    }
+
+    #[test]
+    fn rescheduling_a_reminded_task_reminds_again() {
+        let service = service();
+        let item = planned(
+            &service,
+            "call",
+            Some("2026-11-23"),
+            Some("09:00"),
+            Priority::Normal,
+        );
+        service
+            .take_due_reminders(at("2026-11-23", "09:00"))
+            .unwrap();
+
+        planned_update(&service, &item.id, "call (renamed)", "09:00");
+        assert!(service
+            .take_due_reminders(at("2026-11-23", "10:00"))
+            .unwrap()
+            .is_empty());
+
+        planned_update(&service, &item.id, "call", "11:00");
+        let fired = service
+            .take_due_reminders(at("2026-11-23", "11:00"))
+            .unwrap();
+        assert_eq!(titles(&fired), ["call"]);
+    }
+
+    fn planned_update(service: &ItemService, id: &str, title: &str, time: &str) {
+        service
+            .update(
+                id,
+                UpdateItemRequest {
+                    title: title.into(),
+                    due_date: Some("2026-11-23".into()),
+                    due_time: Some(time.into()),
+                    note: String::new(),
+                    priority: Priority::Normal,
+                },
+            )
+            .unwrap();
     }
 }
