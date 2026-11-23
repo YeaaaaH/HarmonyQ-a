@@ -30,6 +30,17 @@ Code explains itself through naming and structure. Comment only a non-obvious wh
 
 ## Git
 
-`main` is the default branch. Work goes on a `feature/`, `bug/` or `task/` branch and lands via PR once CI (`.github/workflows/ci.yml`) is green. Use the `commit` skill (`/commit`): it delegates to the `committer` subagent (`.claude/agents/committer.md`), which branches, commits, pushes and opens the PR. Releases use the `release` skill (`/release`), the only flow that commits to `main` directly; see `docs/releasing.md`.
+`main` is the default branch. Nothing is pushed to `main` or `feature/*` directly; everything lands via PR once CI (`.github/workflows/ci.yml`) is green.
+
+```
+main <- feature/<slug> <- task/<slug>, bug/<slug>     (a larger change, several PRs)
+main <- task/<slug>, bug/<slug>                        (a standalone small change)
+```
+
+- A feature groups several tasks into one logical change. Start and finish it with the `feature` skill (`/feature start <slug>`, `/feature finish`).
+- Task and bug work uses the `commit` skill (`/commit`): it delegates to the `committer` subagent (`.claude/agents/committer.md`), which branches off the current feature (or `main`), commits, pushes and opens the PR into it.
+- Merge task/bug PRs with **squash**, feature PRs into `main` with a **merge commit**.
+- CI: PRs into a feature run the frontend and Rust checks only; PRs into `main` and pushes to `main` also run the per-OS build check.
+- Releases use the `release` skill (`/release`), the only flow that commits to `main` directly; see `docs/releasing.md`.
 
 Commit message: one line, `HQ-NNN` + at most 7 words briefly saying what changed (e.g. `HQ-002 Add routines table and service`). NNN is the next number after the last commit's, zero-padded to 3 digits. No body, no trailers.

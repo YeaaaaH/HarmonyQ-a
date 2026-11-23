@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit the current changes onto a feature/bug/task branch, push it and open a PR into main, following this repo's conventions (one-line `HQ-NNN` subject, no AI attribution). Direct pushes to main are not used. Use when the user says "commit", "commit and push", "open a PR / MR" or invokes /commit.
+description: Commit the current changes onto a task/bug branch, push it and open a PR into the current feature branch or main, following this repo's conventions (one-line `HQ-NNN` subject, no AI attribution). Direct pushes to main are not used. Use when the user says "commit", "commit and push", "open a PR / MR" or invokes /commit.
 ---
 
 # Commit & PR
