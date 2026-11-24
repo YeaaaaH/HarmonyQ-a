@@ -18,7 +18,7 @@ export interface Project {
 }
 
 export interface ProjectSummary extends Project {
-  /** null means the project needs a next step. */
+  /** First open task with a date or high priority; null when none has one. With openCount 0 the project needs a next step. */
   nextStep: Item | null;
   openCount: number;
   doneCount: number;

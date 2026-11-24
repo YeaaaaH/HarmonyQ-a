@@ -70,21 +70,25 @@ impl ProjectService {
         }
         let outcome = validate_text(&request.outcome, "Outcome", MAX_OUTCOME_LEN)?;
 
-        let now = now_ms();
-        let project = Project {
-            id: new_id(),
-            hue: hue_for(&name),
-            name,
-            outcome,
-            status: ProjectStatus::Active,
-            resume_note: String::new(),
-            created_at: now,
-            updated_at: now,
-            completed_at: None,
-        };
-
+        let project = new_project(name, outcome);
         let conn = self.db.lock()?;
         ProjectRepository::insert(&conn, &project)?;
+        Ok(project)
+    }
+
+    /// Creates a project named after the task and moves the task into it as its first step.
+    pub fn create_from_task(&self, item_id: &str) -> AppResult<Project> {
+        let conn = self.db.lock()?;
+        let item = ItemRepository::find(&conn, item_id)?
+            .ok_or_else(|| AppError::NotFound(format!("Item {item_id}")))?;
+        let name: String = item.title.chars().take(MAX_NAME_LEN).collect();
+        let project = new_project(name.trim().to_string(), String::new());
+
+        // Both writes or neither: no empty project if moving the task fails.
+        let tx = conn.unchecked_transaction()?;
+        ProjectRepository::insert(&tx, &project)?;
+        ItemRepository::update_project(&tx, item_id, Some(&project.id), project.created_at)?;
+        tx.commit()?;
         Ok(project)
     }
 
@@ -134,6 +138,21 @@ fn find(conn: &rusqlite::Connection, id: &str) -> AppResult<Project> {
     ProjectRepository::find(conn, id)?.ok_or_else(|| AppError::NotFound(format!("Project {id}")))
 }
 
+fn new_project(name: String, outcome: String) -> Project {
+    let now = now_ms();
+    Project {
+        id: new_id(),
+        hue: hue_for(&name),
+        name,
+        outcome,
+        status: ProjectStatus::Active,
+        resume_note: String::new(),
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    }
+}
+
 fn summarize(project: Project, tasks: Vec<Item>) -> ProjectSummary {
     let last_activity_at = tasks
         .iter()
@@ -143,7 +162,10 @@ fn summarize(project: Project, tasks: Vec<Item>) -> ProjectSummary {
         .into_iter()
         .partition(|item| item.status == ItemStatus::Open);
     let open_count = open.len();
-    let next_step = open.into_iter().min_by(next_step_order);
+    let next_step = open
+        .into_iter()
+        .min_by(next_step_order)
+        .filter(|item| item.due_date.is_some() || item.priority == Priority::High);
 
     ProjectSummary {
         project,
@@ -313,6 +335,18 @@ mod tests {
     }
 
     #[test]
+    fn no_next_step_is_picked_when_no_open_task_has_a_date_or_priority() {
+        let (projects, items) = services();
+        let p = project(&projects, "Garden");
+        task(&items, &p, "plant tulips", None);
+        task(&items, &p, "buy soil", None);
+
+        let summary = projects.list().unwrap().remove(0);
+        assert!(summary.next_step.is_none());
+        assert_eq!(summary.open_count, 2);
+    }
+
+    #[test]
     fn list_orders_active_by_next_step_then_paused_then_done() {
         let (projects, items) = services();
         project(&projects, "needs a step");
@@ -360,6 +394,31 @@ mod tests {
             .map(|i| i.title)
             .collect();
         assert_eq!(titles, ["dated", "undated", "done"]);
+    }
+
+    #[test]
+    fn a_task_turned_into_a_project_becomes_its_first_step() {
+        let (projects, items) = services();
+        let item = items
+            .create(CreateItemRequest {
+                title: "Renovate the kitchen".into(),
+                due_date: None,
+                project_id: None,
+            })
+            .unwrap();
+
+        let project = projects.create_from_task(&item.id).unwrap();
+        assert_eq!(project.name, "Renovate the kitchen");
+        assert_eq!(project.status, ProjectStatus::Active);
+
+        let tasks = projects.list_tasks(&project.id).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].id, item.id);
+        assert!(matches!(
+            projects.create_from_task("nope"),
+            Err(AppError::NotFound(_))
+        ));
+        assert_eq!(projects.list().unwrap().len(), 1);
     }
 
     #[test]

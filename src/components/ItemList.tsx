@@ -1,19 +1,30 @@
 import { CalendarDays, Clock, Flag, StickyNote, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { projectColor } from "@/lib/projectColor";
 import { cn } from "@/lib/utils";
 import type { Item } from "@/types/item";
+import type { ProjectSummary } from "@/types/project";
 
 interface Props {
   items: Item[];
   /** Marks the dates as overdue. */
   overdue?: boolean;
+  /** When given, each task shows its project's color and name. */
+  projects?: Map<string, ProjectSummary>;
   onOpen: (item: Item) => void;
   onToggle: (item: Item) => void;
   onRemove: (id: string) => void;
 }
 
-export function ItemList({ items, overdue = false, onOpen, onToggle, onRemove }: Props) {
+export function ItemList({
+  items,
+  overdue = false,
+  projects,
+  onOpen,
+  onToggle,
+  onRemove,
+}: Props) {
   if (items.length === 0) {
     return <p className="py-8 text-center text-muted-foreground">Nothing here yet.</p>;
   }
@@ -34,7 +45,11 @@ export function ItemList({ items, overdue = false, onOpen, onToggle, onRemove }:
               >
                 {item.title}
               </span>
-              <ItemMeta item={item} overdue={overdue} />
+              <ItemMeta
+                item={item}
+                overdue={overdue}
+                project={item.projectId ? projects?.get(item.projectId) : undefined}
+              />
             </button>
             <Button
               variant="ghost"
@@ -52,12 +67,29 @@ export function ItemList({ items, overdue = false, onOpen, onToggle, onRemove }:
   );
 }
 
-export function ItemMeta({ item, overdue }: { item: Item; overdue: boolean }) {
+export function ItemMeta({
+  item,
+  overdue,
+  project,
+}: {
+  item: Item;
+  overdue: boolean;
+  project?: ProjectSummary;
+}) {
   const high = item.priority === "high";
-  if (!item.dueDate && !item.note && !high) return null;
+  if (!item.dueDate && !item.note && !high && !project) return null;
 
   return (
-    <span className="flex items-center gap-3 text-xs text-muted-foreground [&_svg]:size-3.5">
+    <span className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground [&_svg]:size-3.5">
+      {project && (
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: projectColor(project.hue) }}
+          />
+          <span className="truncate">{project.name}</span>
+        </span>
+      )}
       {item.dueDate && (
         <span className={cn("flex items-center gap-1", overdue && "text-destructive")}>
           <CalendarDays />

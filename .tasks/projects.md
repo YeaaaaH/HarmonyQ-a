@@ -12,7 +12,7 @@ A list alone does not fix that. A project helps only if it answers "what do I do
 | Effect | What it says | Rule for HarmonyQ'a |
 |---|---|---|
 | **Zeigarnik effect / open loops** | Unfinished tasks keep popping into your head. | Getting a thought into a project must take seconds: quick-add inside the project, title only. |
-| **Masicampo & Baumeister (2011)** | Those intrusive thoughts stop once there is a *concrete plan*, even before the task is done. | Every active project shows its **next step**. A project with no open task is flagged "needs a next step", the only warning a project gets. |
+| **Masicampo & Baumeister (2011)** | Those intrusive thoughts stop once there is a *concrete plan*, even before the task is done. | Every active project shows its **next step** when there is a reason for one: the first open task with a date or marked important. Among undated, normal tasks nothing is highlighted, since "the oldest" would be a fake choice. A project with no open task is flagged "needs a next step", the only warning a project gets. |
 | **Implementation intentions (Gollwitzer)** | "When X, I will do Y" doubles follow-through. | One click puts the next step on Today, or on a date/time (reuses due date + reminders). |
 | **Hick's law, cognitive load** | More choices, slower and more tiring decisions. | No limit on projects: a project may be 2 steps or 20, and there may be many. Instead the app makes the choice for you: projects are **sorted by their next step** (due soonest first, then recently touched), so the top of the list is what matters now. *Paused* projects are hidden from the sidebar. |
 | **Ovsiankina effect, resumption cost** | We want to resume interrupted work, but getting back in costs effort. | A **"where I left off"** note per project, shown at the top of the project view. Write it when you stop, read it when you come back. |
@@ -30,7 +30,7 @@ A list alone does not fix that. A project helps only if it answers "what do I do
 - `items.project_id` nullable, `ON DELETE SET NULL`. Tasks without a project stay exactly as today.
 - `items.completed_at` (ms, set when a task is ticked, cleared when unticked): needed for the pulse, "done this week" and the Done shelf. Tasks ticked before this migration have none and just do not count.
 - **Freshness is derived**: from the project's last activity (task added, ticked or edited, note changed), 1.0 at 0 days down to 0.0 at 14 days. The UI maps it to saturation and opacity.
-- **Next step is derived, not stored**: the first open task of the project, by due date, then time, then priority, then oldest. No extra state to keep in sync.
+- **Next step is derived, not stored**: the first open task of the project, by due date, then time, then priority, then oldest, and only if it has a date or high priority. No extra state to keep in sync.
 - Rules live in `ProjectService`: ordering by next step, "needs next step", freshness, weekly pulse counts, complete with open tasks.
 
 ## UI
@@ -38,9 +38,9 @@ A list alone does not fix that. A project helps only if it answers "what do I do
 - Sidebar: a **Projects** section under Today / All tasks with the active projects in next-step order (open task count as a badge) and a "+" to create one. The section scrolls on its own, so a long list never pushes Today away. Paused and done projects sit behind "Show all".
 - **Project view**, top to bottom:
   1. Name with its color, "Done when...", pulse sparkline, status menu (pause / complete).
-  2. **Next step** card, the most prominent element, with "Do today" and a date picker.
+  2. **Steps**: open tasks as one list of markers in the project color, no connecting line (steps are often independent and done in parallel). The next step comes first with a filled marker, larger text and "Do today": a hint where to start, not a dependency. The rest follow quieter. Clicking a marker ticks the step. No separate card.
   3. "Where I left off" note (inline editable, one-line preview).
-  4. Open tasks + quick-add (new tasks go into this project).
+  4. Quick-add above the path (new steps go into this project).
   5. Done tasks, collapsed, with "N done this week".
 - Task editor: a project picker, and **"Turn into project"**: creates a project named after the task, the task stays inside it as the first step (you often see a task has steps only once you start it).
 - Today / All tasks: a color dot + muted project name on each task, so the context stays visible without a separate screen.
