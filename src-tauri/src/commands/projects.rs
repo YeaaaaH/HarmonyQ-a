@@ -33,6 +33,14 @@ pub async fn create_project(
 }
 
 #[tauri::command]
+pub async fn turn_task_into_project(
+    state: State<'_, AppState>,
+    item_id: String,
+) -> Result<Project, AppError> {
+    state.projects.create_from_task(&item_id)
+}
+
+#[tauri::command]
 pub async fn update_project(
     state: State<'_, AppState>,
     id: String,

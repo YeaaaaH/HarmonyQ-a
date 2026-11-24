@@ -40,7 +40,7 @@ Dependencies point one way: commands -> services -> repositories -> db. `lib.rs`
 - `projects` groups tasks; `items.project_id` is nullable with `ON DELETE SET NULL`, so deleting a project keeps its tasks. `PRAGMA foreign_keys = ON` is set per connection in `db/mod.rs`.
 - `items.completed_at` (ms) is stamped when a task is ticked and cleared when unticked; tasks done before migration 0004 have none.
 - `projects.hue` (0-359) is derived from the name at creation and stored, so renaming keeps the color.
-- A project's next step is derived, not stored: its first open task by date, time, priority, age (`ProjectService`).
+- A project's next step is derived, not stored: its first open task by date, time, priority, age, and only if that task has a date or is important; otherwise there is none (`ProjectService`).
 
 ## Rust <-> TypeScript contract
 

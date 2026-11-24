@@ -51,7 +51,9 @@ pub struct Project {
 pub struct ProjectSummary {
     #[serde(flatten)]
     pub project: Project,
-    /// First open task by date, time, priority, age; `None` means "needs a next step".
+    /// First open task by date, time, priority, age, but only if it has a date or is important:
+    /// picking the oldest of undated tasks would look like a choice that was never made.
+    /// `None` with `open_count == 0` means "needs a next step".
     pub next_step: Option<Item>,
     pub open_count: usize,
     pub done_count: usize,

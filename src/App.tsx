@@ -15,9 +15,15 @@ export default function App() {
   useSystemTheme();
   const [view, setView] = useState<View>("today");
   const [projectId, setProjectId] = useState<string | null>(null);
-  const { items, error, clearError, add, update, toggle, remove } = useItems();
+  const { items, error, clearError, reload, add, update, toggle, move, remove } = useItems();
   const today = useToday(items);
-  const { projects, error: projectsError, create: createProject } = useProjects(items);
+  const {
+    projects,
+    error: projectsError,
+    create: createProject,
+    turnTaskIntoProject,
+  } = useProjects(items);
+  const projectsById = new Map(projects.map((p) => [p.id, p]));
   const projectTasks = useProjectTasks(projectId, items);
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,17 +101,24 @@ export default function App() {
               />
               {error && !editing && <p className="text-sm text-destructive">{error}</p>}
 
-              {view === "all" && <ItemList items={items} {...listProps} />}
+              {view === "all" && (
+                <ItemList items={items} projects={projectsById} {...listProps} />
+              )}
 
               {view === "today" && today && (
                 <>
                   {today.overdue.length > 0 && (
                     <Section title="Overdue">
-                      <ItemList items={today.overdue} overdue {...listProps} />
+                      <ItemList
+                        items={today.overdue}
+                        overdue
+                        projects={projectsById}
+                        {...listProps}
+                      />
                     </Section>
                   )}
                   <Section title={today.overdue.length > 0 ? "Today" : undefined}>
-                    <ItemList items={today.today} {...listProps} />
+                    <ItemList items={today.today} projects={projectsById} {...listProps} />
                   </Section>
                 </>
               )}
@@ -117,7 +130,16 @@ export default function App() {
       <TaskEditor
         item={editing}
         error={error}
+        projects={projects}
         onSave={update}
+        onMove={move}
+        onTurnIntoProject={async (item) => {
+          const created = await turnTaskIntoProject(item.id);
+          if (!created) return;
+          setEditingId(null);
+          setProjectId(created.id);
+          await reload();
+        }}
         onClose={() => setEditingId(null)}
       />
     </div>

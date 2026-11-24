@@ -29,7 +29,17 @@ export function useProjects(items: Item[]) {
     }
   };
 
-  return { projects, error, create };
+  const turnTaskIntoProject = async (itemId: string): Promise<Project | null> => {
+    try {
+      setError(null);
+      return await api.turnTaskIntoProject(itemId);
+    } catch (e) {
+      setError(String(e));
+      return null;
+    }
+  };
+
+  return { projects, error, create, turnTaskIntoProject };
 }
 
 /** Tasks of one project in the backend's order: open by next step, then done. */
