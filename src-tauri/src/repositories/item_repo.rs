@@ -3,8 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use crate::error::AppResult;
 use crate::models::item::{Item, ItemStatus, Priority};
 
-const COLUMNS: &str =
-    "id, title, status, due_date, due_time, note, priority, created_at, updated_at";
+const COLUMNS: &str = "id, title, status, due_date, due_time, note, priority, project_id,                        completed_at, created_at, updated_at";
 
 pub struct ItemRepository;
 
@@ -69,7 +68,7 @@ impl ItemRepository {
 
     pub fn insert(conn: &Connection, item: &Item) -> AppResult<()> {
         conn.execute(
-            &format!("INSERT INTO items ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"),
+            &format!("INSERT INTO items ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"),
             params![
                 item.id,
                 item.title,
@@ -78,6 +77,8 @@ impl ItemRepository {
                 item.due_time,
                 item.note,
                 item.priority.as_str(),
+                item.project_id,
+                item.completed_at,
                 item.created_at,
                 item.updated_at
             ],
@@ -104,6 +105,7 @@ impl ItemRepository {
         Ok(changed)
     }
 
+    /// Ticking stamps `completed_at` with `updated_at`; unticking clears it.
     pub fn update_status(
         conn: &Connection,
         id: &str,
@@ -111,10 +113,47 @@ impl ItemRepository {
         updated_at: i64,
     ) -> AppResult<usize> {
         let changed = conn.execute(
-            "UPDATE items SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE items
+             SET status = ?1, updated_at = ?2,
+                 completed_at = CASE WHEN ?1 = 'done' THEN COALESCE(completed_at, ?2) END
+             WHERE id = ?3",
             params![status.as_str(), updated_at, id],
         )?;
         Ok(changed)
+    }
+
+    pub fn update_project(
+        conn: &Connection,
+        id: &str,
+        project_id: Option<&str>,
+        updated_at: i64,
+    ) -> AppResult<usize> {
+        let changed = conn.execute(
+            "UPDATE items SET project_id = ?1, updated_at = ?2 WHERE id = ?3",
+            params![project_id, updated_at, id],
+        )?;
+        Ok(changed)
+    }
+
+    pub fn list_by_project(conn: &Connection, project_id: &str) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items WHERE project_id = ?1"
+        ))?;
+        let items = stmt
+            .query_map(params![project_id], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    /// Every task that belongs to some project.
+    pub fn list_in_projects(conn: &Connection) -> AppResult<Vec<Item>> {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM items WHERE project_id IS NOT NULL"
+        ))?;
+        let items = stmt
+            .query_map([], map_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
     }
 
     pub fn delete(conn: &Connection, id: &str) -> AppResult<usize> {
@@ -138,6 +177,8 @@ fn map_row(row: &Row) -> rusqlite::Result<Item> {
         due_time: row.get("due_time")?,
         note: row.get("note")?,
         priority,
+        project_id: row.get("project_id")?,
+        completed_at: row.get("completed_at")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })

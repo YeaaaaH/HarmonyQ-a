@@ -72,6 +72,9 @@ pub struct Item {
     pub due_time: Option<String>,
     pub note: String,
     pub priority: Priority,
+    pub project_id: Option<String>,
+    /// Set when the task is ticked, cleared when unticked. Tasks done before projects existed have none.
+    pub completed_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

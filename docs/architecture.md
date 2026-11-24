@@ -18,7 +18,7 @@ flowchart LR
 | `services/` | Validation and business rules, orchestrate repositories | know about Tauri or SQL strings |
 | `repositories/` | SQL and row mapping; take `&Connection` | contain business rules |
 | `db/` | Connection handle (`Db`), migration runner, `migrations/*.sql` | |
-| `models/` | Domain types (`Item`, `ItemStatus`), also serialised to the UI | |
+| `models/` | Domain types (`Item`, `Project`, `ProjectSummary`), also serialised to the UI | |
 | `dto/` | Input types for the IPC boundary | |
 | `error.rs` | `AppError`; serialised to the UI as a message string | |
 | `state.rs` | `AppState` holding the services, managed by Tauri | |
@@ -37,6 +37,10 @@ Dependencies point one way: commands -> services -> repositories -> db. `lib.rs`
 - Enum columns (`status`, `priority`) are stored as lowercase text.
 - `reminded_at` (ms, internal, not sent to the UI) marks that the reminder for the current `due_date`/`due_time` was shown; `update_details` clears it when either changes. `reminders.rs` polls `ItemService::take_due_reminders` every 20 s while the app runs.
 - Ids are UUID v4 strings.
+- `projects` groups tasks; `items.project_id` is nullable with `ON DELETE SET NULL`, so deleting a project keeps its tasks. `PRAGMA foreign_keys = ON` is set per connection in `db/mod.rs`.
+- `items.completed_at` (ms) is stamped when a task is ticked and cleared when unticked; tasks done before migration 0004 have none.
+- `projects.hue` (0-359) is derived from the name at creation and stored, so renaming keeps the color.
+- A project's next step is derived, not stored: its first open task by date, time, priority, age (`ProjectService`).
 
 ## Rust <-> TypeScript contract
 

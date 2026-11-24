@@ -7,6 +7,7 @@ use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
 use crate::error::{AppError, AppResult};
 use crate::models::item::{Item, ItemStatus, Priority, TodayView};
 use crate::repositories::item_repo::ItemRepository;
+use crate::repositories::project_repo::ProjectRepository;
 use crate::utils::{id::new_id, time::now_ms};
 
 const MAX_TITLE_LEN: usize = 500;
@@ -60,6 +61,10 @@ impl ItemService {
         let title = validate_title(&request.title)?;
         let due_date = validate_date(request.due_date)?;
 
+        let conn = self.db.lock()?;
+        if let Some(project_id) = &request.project_id {
+            ensure_project_exists(&conn, project_id)?;
+        }
         let now = now_ms();
         let item = Item {
             id: new_id(),
@@ -69,11 +74,12 @@ impl ItemService {
             due_time: None,
             note: String::new(),
             priority: Priority::Normal,
+            project_id: request.project_id,
+            completed_at: None,
             created_at: now,
             updated_at: now,
         };
 
-        let conn = self.db.lock()?;
         ItemRepository::insert(&conn, &item)?;
         Ok(item)
     }
@@ -115,12 +121,32 @@ impl ItemService {
         ItemRepository::find(&conn, id)?.ok_or_else(|| AppError::NotFound(format!("Item {id}")))
     }
 
+    /// `None` takes the task out of its project.
+    pub fn set_project(&self, id: &str, project_id: Option<String>) -> AppResult<Item> {
+        let conn = self.db.lock()?;
+        if let Some(project_id) = &project_id {
+            ensure_project_exists(&conn, project_id)?;
+        }
+        let changed = ItemRepository::update_project(&conn, id, project_id.as_deref(), now_ms())?;
+        if changed == 0 {
+            return Err(AppError::NotFound(format!("Item {id}")));
+        }
+        ItemRepository::find(&conn, id)?.ok_or_else(|| AppError::NotFound(format!("Item {id}")))
+    }
+
     pub fn delete(&self, id: &str) -> AppResult<()> {
         let conn = self.db.lock()?;
         if ItemRepository::delete(&conn, id)? == 0 {
             return Err(AppError::NotFound(format!("Item {id}")));
         }
         Ok(())
+    }
+}
+
+fn ensure_project_exists(conn: &rusqlite::Connection, project_id: &str) -> AppResult<()> {
+    match ProjectRepository::find(conn, project_id)? {
+        Some(_) => Ok(()),
+        None => Err(AppError::NotFound(format!("Project {project_id}"))),
     }
 }
 
@@ -192,6 +218,7 @@ mod tests {
         CreateItemRequest {
             title: title.into(),
             due_date: None,
+            project_id: None,
         }
     }
 
@@ -226,6 +253,7 @@ mod tests {
             .create(CreateItemRequest {
                 title: "pay rent".into(),
                 due_date: Some("2026-11-24".into()),
+                project_id: None,
             })
             .unwrap();
         assert_eq!(item.due_date.as_deref(), Some("2026-11-24"));
@@ -435,6 +463,53 @@ mod tests {
 
         let updated = service.set_status(&item.id, ItemStatus::Done).unwrap();
         assert_eq!(updated.status, ItemStatus::Done);
+    }
+
+    #[test]
+    fn ticking_stamps_completed_at_once_and_unticking_clears_it() {
+        let service = service();
+        let item = service.create(request("task")).unwrap();
+        assert_eq!(item.completed_at, None);
+
+        let done = service.set_status(&item.id, ItemStatus::Done).unwrap();
+        let stamped = done.completed_at.expect("completed_at set");
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        let again = service.set_status(&item.id, ItemStatus::Done).unwrap();
+        assert_eq!(again.completed_at, Some(stamped));
+
+        let reopened = service.set_status(&item.id, ItemStatus::Open).unwrap();
+        assert_eq!(reopened.completed_at, None);
+    }
+
+    #[test]
+    fn tasks_move_into_and_out_of_projects_but_not_into_a_missing_one() {
+        use crate::dto::project::CreateProjectRequest;
+        use crate::services::project_service::ProjectService;
+
+        let db = Db::open_in_memory().unwrap();
+        let items = ItemService::new(db.clone());
+        let project = ProjectService::new(db)
+            .create(CreateProjectRequest {
+                name: "Taxes".into(),
+                outcome: String::new(),
+            })
+            .unwrap();
+        let item = items.create(request("file return")).unwrap();
+
+        let moved = items
+            .set_project(&item.id, Some(project.id.clone()))
+            .unwrap();
+        assert_eq!(moved.project_id.as_deref(), Some(project.id.as_str()));
+        let out = items.set_project(&item.id, None).unwrap();
+        assert_eq!(out.project_id, None);
+
+        assert!(matches!(
+            items.set_project(&item.id, Some("nope".into())),
+            Err(AppError::NotFound(_))
+        ));
+        let mut req = request("orphan");
+        req.project_id = Some("nope".into());
+        assert!(matches!(items.create(req), Err(AppError::NotFound(_))));
     }
 
     #[test]
