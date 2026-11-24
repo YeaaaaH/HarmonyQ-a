@@ -56,6 +56,7 @@ Types are defined twice: Rust structs (`models/`, `dto/`) and TS types (`src/typ
 - `hooks/`: state per domain (`useItems`); call the API, hold React state.
 - `lib/api/`: one typed `invoke` wrapper per command; no logic.
 - `lib/utils.ts`: `cn()` for merging class names.
+- `lib/projectColor.ts`: a project's color is `oklch()` from its stored hue plus per-theme `--project-l` / `--project-c` tokens, so every project fits the palette in light and dark.
 - `types/`: TS mirror of the Rust types.
 - Imports use the `@/` alias for `src/`.
 - Styling: Tailwind v4 + theme tokens in `src/index.css` (`:root` light, `.dark` dark). Components use tokens (`bg-card`, `text-muted-foreground`), never raw colors.

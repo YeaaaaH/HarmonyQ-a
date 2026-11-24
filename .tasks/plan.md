@@ -39,7 +39,7 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 
 ### Projects (`feature/projects`)
 Group tasks into projects, each with a visible next step. Design and reasoning: `.tasks/projects.md`.
-- [ ] BE only (written before the vertical-slice rule): migration + model + service + commands for `projects` (with `hue`), `items.project_id`, `items.completed_at`
+- [x] BE only (written before the vertical-slice rule): migration + model + service + commands for `projects` (with `hue`), `items.project_id`, `items.completed_at`
 - [ ] BE+FE: TS types and API wrappers, sidebar Projects section, project view with quick-add, next step card, project colors
 - [ ] BE+FE: project picker in task editor, color dot in Today / All tasks, turn a task into a project
 - [ ] BE+FE: lifecycle (pause / complete with open tasks handled), fading stale projects, Done shelf

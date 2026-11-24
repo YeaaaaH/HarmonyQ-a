@@ -72,6 +72,8 @@
     --sidebar-accent-foreground: #1f2421;
     --sidebar-border: #e2dfd7;
     --sidebar-ring: #7fb8a7;
+    --project-l: 0.62;
+    --project-c: 0.11;
 }
 
 .dark {
@@ -103,6 +105,8 @@
     --sidebar-accent-foreground: #e7ece9;
     --sidebar-border: #2c3430;
     --sidebar-ring: #5fb39b;
+    --project-l: 0.72;
+    --project-c: 0.1;
 }
 
 @layer base {
