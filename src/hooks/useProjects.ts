@@ -42,25 +42,36 @@ export function useProjects(items: Item[]) {
   return { projects, error, create, turnTaskIntoProject };
 }
 
+interface ProjectTasks {
+  tasks: Item[];
+  error: string | null;
+  /** False until the first answer for this project arrives. */
+  loaded: boolean;
+}
+
 /** Tasks of one project in the backend's order: open by next step, then done. */
-export function useProjectTasks(projectId: string | null, items: Item[]) {
-  const [tasks, setTasks] = useState<Item[]>([]);
+export function useProjectTasks(projectId: string | null, items: Item[]): ProjectTasks {
+  const [state, setState] = useState<ProjectTasks & { projectId: string | null }>({
+    projectId: null,
+    tasks: [],
+    error: null,
+    loaded: false,
+  });
 
   useEffect(() => {
-    if (!projectId) {
-      setTasks([]);
-      return;
-    }
+    if (!projectId) return;
     // Ignore a late answer for a project the user has already left.
     let current = true;
     api.listProjectTasks(projectId).then(
-      (list) => current && setTasks(list),
-      () => current && setTasks([]),
+      (tasks) => current && setState({ projectId, tasks, error: null, loaded: true }),
+      (e) => current && setState({ projectId, tasks: [], error: String(e), loaded: true }),
     );
     return () => {
       current = false;
     };
   }, [projectId, items]);
 
-  return tasks;
+  // Keyed by project, so another project's steps never show under this one.
+  if (state.projectId !== projectId) return { tasks: [], error: null, loaded: false };
+  return state;
 }

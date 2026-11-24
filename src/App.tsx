@@ -71,7 +71,9 @@ export default function App() {
               <ProjectView
                 key={project.id}
                 project={project}
-                tasks={projectTasks}
+                tasks={projectTasks.tasks}
+                tasksError={projectTasks.error}
+                tasksLoaded={projectTasks.loaded}
                 today={today?.date ?? null}
                 onAdd={(title) => add(title, null, project.id)}
                 onDoToday={(item) =>
@@ -129,7 +131,7 @@ export default function App() {
       </main>
       <TaskEditor
         item={editing}
-        error={error}
+        error={error ?? projectsError}
         projects={projects}
         onSave={update}
         onMove={move}

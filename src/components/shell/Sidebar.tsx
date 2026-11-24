@@ -122,14 +122,18 @@ function NewProjectInput({
   onCreate,
   onCancel,
 }: {
-  onCreate: (name: string) => void;
+  onCreate: (name: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const handleKey = (event: KeyboardEvent) => {
-    if (event.key === "Enter" && name.trim()) onCreate(name);
+  const handleKey = async (event: KeyboardEvent) => {
     if (event.key === "Escape") onCancel();
+    if (event.key !== "Enter" || !name.trim() || busy) return;
+    setBusy(true);
+    await onCreate(name);
+    setBusy(false);
   };
 
   return (

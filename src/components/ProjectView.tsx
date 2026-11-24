@@ -12,6 +12,8 @@ interface Props {
   project: ProjectSummary;
   /** Open tasks in next-step order, then done ones (backend order). */
   tasks: Item[];
+  tasksError: string | null;
+  tasksLoaded: boolean;
   /** Today's local date, `YYYY-MM-DD`, once known. */
   today: string | null;
   onAdd: (title: string) => Promise<boolean>;
@@ -21,7 +23,16 @@ interface Props {
   onRemove: (id: string) => void;
 }
 
-export function ProjectView({ project, tasks, today, onAdd, onDoToday, ...listProps }: Props) {
+export function ProjectView({
+  project,
+  tasks,
+  tasksError,
+  tasksLoaded,
+  today,
+  onAdd,
+  onDoToday,
+  ...listProps
+}: Props) {
   const [showDone, setShowDone] = useState(false);
   const open = tasks.filter((t) => t.status === "open");
   const done = tasks.filter((t) => t.status === "done");
@@ -41,8 +52,10 @@ export function ProjectView({ project, tasks, today, onAdd, onDoToday, ...listPr
 
       <AddItemForm onAdd={onAdd} placeholder="Add a step" />
 
+      {tasksError && <p className="text-sm text-destructive">{tasksError}</p>}
+
       <ol className="flex flex-col gap-3 pt-1">
-        {open.length === 0 && <EmptyStep />}
+        {tasksLoaded && !tasksError && open.length === 0 && <EmptyStep />}
         {open.map((step, index) => (
           <Step
             key={step.id}

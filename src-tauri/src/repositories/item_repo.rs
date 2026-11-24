@@ -3,7 +3,8 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use crate::error::AppResult;
 use crate::models::item::{Item, ItemStatus, Priority};
 
-const COLUMNS: &str = "id, title, status, due_date, due_time, note, priority, project_id,                        completed_at, created_at, updated_at";
+const COLUMNS: &str = "id, title, status, due_date, due_time, note, priority, project_id, \
+                       completed_at, created_at, updated_at";
 
 pub struct ItemRepository;
 
@@ -145,7 +146,6 @@ impl ItemRepository {
         Ok(items)
     }
 
-    /// Every task that belongs to some project.
     pub fn list_in_projects(conn: &Connection) -> AppResult<Vec<Item>> {
         let mut stmt = conn.prepare(&format!(
             "SELECT {COLUMNS} FROM items WHERE project_id IS NOT NULL"

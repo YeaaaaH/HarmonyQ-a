@@ -41,9 +41,10 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 Group tasks into projects, each with a visible next step. Design and reasoning: `.tasks/projects.md`.
 - [x] BE only (written before the vertical-slice rule): migration + model + service + commands for `projects` (with `hue`), `items.project_id`, `items.completed_at`
 - [x] BE+FE: TS types and API wrappers, sidebar Projects section, project view with quick-add, next step card, project colors
-- [ ] BE+FE: project picker in task editor, color dot in Today / All tasks, turn a task into a project
-- [ ] BE+FE: lifecycle (pause / complete with open tasks handled), fading stale projects, Done shelf
-- [ ] BE+FE: "Where I left off" note, done-this-week, pulse sparkline, ink strikethrough
+- [x] BE+FE: project picker in task editor, color dot in Today / All tasks, turn a task into a project
+- [x] Code review fixes
+
+Moved to Later after daily use: lifecycle and progress (see below).
 
 ### Brain dump (`feature/brain-dump`)
 Empty your head first, organise later. Capture and sorting are separate modes.
@@ -71,4 +72,4 @@ Close the day's open loops before sleep.
 - [ ] SQLite FTS5 index + search box
 
 ## Later (only if daily use demands it)
-Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.
+Projects lifecycle: pause / complete with a dialog for open tasks, rename and "Done when...", fading stale projects, Done shelf. Projects progress: "Where I left off" note, done-this-week, pulse sparkline, ink strikethrough. Refresh project summaries only when a change touches a project (today every item change re-reads them). Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.
