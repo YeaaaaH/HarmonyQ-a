@@ -52,7 +52,7 @@ export function ItemList({ items, overdue = false, onOpen, onToggle, onRemove }:
   );
 }
 
-function ItemMeta({ item, overdue }: { item: Item; overdue: boolean }) {
+export function ItemMeta({ item, overdue }: { item: Item; overdue: boolean }) {
   const high = item.priority === "high";
   if (!item.dueDate && !item.note && !high) return null;
 

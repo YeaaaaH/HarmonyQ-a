@@ -24,9 +24,9 @@ export function useItems() {
   const replace = (updated: Item) =>
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
 
-  const add = (title: string, dueDate: string | null = null) =>
+  const add = (title: string, dueDate: string | null = null, projectId: string | null = null) =>
     run(async () => {
-      const created = await api.createItem(title, dueDate);
+      const created = await api.createItem(title, dueDate, projectId);
       setItems((prev) => [created, ...prev]);
     });
 
