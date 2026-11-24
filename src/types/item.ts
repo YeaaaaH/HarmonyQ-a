@@ -12,6 +12,9 @@ export interface Item {
   dueTime: string | null;
   note: string;
   priority: Priority;
+  projectId: string | null;
+  /** Unix ms when ticked; null while open and for tasks done before projects existed. */
+  completedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }

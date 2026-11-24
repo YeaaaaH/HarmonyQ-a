@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 
 interface Props {
   onAdd: (title: string) => Promise<boolean>;
+  placeholder?: string;
 }
 
-export function AddItemForm({ onAdd }: Props) {
+export function AddItemForm({ onAdd, placeholder = "What's on your mind?" }: Props) {
   const [title, setTitle] = useState("");
 
   const handleSubmit = async (event: FormEvent) => {
@@ -22,7 +23,7 @@ export function AddItemForm({ onAdd }: Props) {
         autoFocus
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="What's on your mind?"
+        placeholder={placeholder}
       />
       <Button type="submit">
         <Plus />

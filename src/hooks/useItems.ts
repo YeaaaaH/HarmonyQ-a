@@ -17,16 +17,21 @@ export function useItems() {
     }
   }, []);
 
+  const reload = useCallback(
+    () => run(async () => setItems(await api.listItems())),
+    [run],
+  );
+
   useEffect(() => {
-    run(async () => setItems(await api.listItems()));
-  }, [run]);
+    reload();
+  }, [reload]);
 
   const replace = (updated: Item) =>
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
 
-  const add = (title: string, dueDate: string | null = null) =>
+  const add = (title: string, dueDate: string | null = null, projectId: string | null = null) =>
     run(async () => {
-      const created = await api.createItem(title, dueDate);
+      const created = await api.createItem(title, dueDate, projectId);
       setItems((prev) => [created, ...prev]);
     });
 
@@ -39,11 +44,24 @@ export function useItems() {
       replace(await api.setItemStatus(item.id, next));
     });
 
+  const move = (id: string, projectId: string | null) =>
+    run(async () => replace(await api.setItemProject(id, projectId)));
+
   const remove = (id: string) =>
     run(async () => {
       await api.deleteItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
     });
 
-  return { items, error, clearError: () => setError(null), add, update, toggle, remove };
+  return {
+    items,
+    error,
+    clearError: () => setError(null),
+    reload,
+    add,
+    update,
+    toggle,
+    move,
+    remove,
+  };
 }

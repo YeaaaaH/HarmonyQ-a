@@ -8,6 +8,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_create_items.sql"),
     include_str!("migrations/0002_add_item_details.sql"),
     include_str!("migrations/0003_add_reminded_at.sql"),
+    include_str!("migrations/0004_create_projects.sql"),
 ];
 
 pub fn run(conn: &mut Connection) -> AppResult<()> {
@@ -52,6 +53,8 @@ mod tests {
         assert_eq!(item.note, "");
         assert_eq!(item.priority, Priority::Normal);
         assert_eq!(item.updated_at, 2);
+        assert_eq!(item.project_id, None);
+        assert_eq!(item.completed_at, None);
     }
 
     #[test]

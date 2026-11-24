@@ -2,12 +2,14 @@
 
 Each step ends with using the app for a few days before starting the next.
 
+A task that touches both frontend and backend is split into vertical slices, not layers: each PR carries the backend it needs plus the UI for it, so it can be tried in the running app right away. No backend-only PR without a screen to test it from.
+
 ## Step 0 - Walking skeleton (this scaffold)
 - [x] Tauri + React + layered Rust backend
 - [x] SQLite `items` table with migrations
 - [x] List / add / toggle / delete on one screen
 - [x] `cargo test` green
-- [ ] First run on Windows (`npm run tauri dev`)
+- [x] First run on Windows (`npm run tauri dev`)
 
 ## Step 1 - Infrastructure
 Reference: cURLyQ (`.github/workflows/`, `docs/releasing.md`).
@@ -18,7 +20,7 @@ Reference: cURLyQ (`.github/workflows/`, `docs/releasing.md`).
 - [x] `docs/releasing.md`; switch to feature branches + PRs
 - [x] First green CI run
 - [x] Feature branches: task PRs skip the per-OS build check
-- [ ] First draft release `v0.1.0`
+- [x] First draft release `v0.1.0`
 - [x] Real app icon (`npx tauri icon`, source `src-tauri/icons/app-icon.svg`)
 
 ## Step 2 - Daily use
@@ -34,6 +36,25 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 - [x] Today view: overdue (carried over, marked) + today, sorted by time and priority
 - [x] Reminders: OS notification at the task's time while the app runs (and hidden in the tray)
 - [x] Tray: closing the window hides the app to the tray; single instance
+
+### Projects (`feature/projects`)
+Group tasks into projects, each with a visible next step. Design and reasoning: `.tasks/projects.md`.
+- [x] BE only (written before the vertical-slice rule): migration + model + service + commands for `projects` (with `hue`), `items.project_id`, `items.completed_at`
+- [x] BE+FE: TS types and API wrappers, sidebar Projects section, project view with quick-add, next step card, project colors
+- [x] BE+FE: project picker in task editor, color dot in Today / All tasks, turn a task into a project
+- [x] Code review fixes
+
+Moved to Later after daily use: lifecycle and progress (see below).
+
+### Brain dump (`feature/brain-dump`)
+Empty your head first, organise later. Capture and sorting are separate modes.
+- [ ] Full-screen capture: one thought per line, Enter for the next, no fields
+- [ ] Sorting pass: one card at a time, one key each to a project, Today, someday or bin
+
+### Shutdown (`feature/shutdown`)
+Close the day's open loops before sleep.
+- [ ] Evening tray prompt (time in Settings): "Anything still on your mind?" -> brain dump
+- [ ] For projects touched today, offer a one-line "where I left off" note
 
 ### Item types (`feature/item-types`)
 - [ ] Migration: type, who (due date comes from daily tasks)
@@ -51,4 +72,4 @@ One-off tasks for a given day. Sidebar: Today, All tasks (other sections arrive 
 - [ ] SQLite FTS5 index + search box
 
 ## Later (only if daily use demands it)
-Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.
+Projects lifecycle: pause / complete with a dialog for open tasks, rename and "Done when...", fading stale projects, Done shelf. Projects progress: "Where I left off" note, done-this-week, pulse sparkline, ink strikethrough. Refresh project summaries only when a change touches a project (today every item change re-reads them). Global quick-capture hotkey, DB backup (`VACUUM INTO`), attachments (folder / link / chat), weekly review, tags, generated TS types (tauri-specta), custom title bar, code signing.

@@ -8,6 +8,8 @@ pub struct CreateItemRequest {
     pub title: String,
     #[serde(default)]
     pub due_date: Option<String>,
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 /// Full replacement of the editable fields; the UI always sends all of them.
