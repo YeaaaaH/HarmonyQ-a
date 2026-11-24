@@ -42,6 +42,15 @@ pub async fn set_item_status(
 }
 
 #[tauri::command]
+pub async fn set_item_project(
+    state: State<'_, AppState>,
+    id: String,
+    project_id: Option<String>,
+) -> Result<Item, AppError> {
+    state.items.set_project(&id, project_id)
+}
+
+#[tauri::command]
 pub async fn delete_item(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     state.items.delete(&id)
 }
