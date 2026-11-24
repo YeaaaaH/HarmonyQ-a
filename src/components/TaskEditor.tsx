@@ -33,6 +33,7 @@ interface Props {
   projects: ProjectSummary[];
   onSave: (id: string, details: ItemDetails) => Promise<boolean>;
   onMove: (id: string, projectId: string | null) => Promise<boolean>;
+  /** Called after the form is saved, so the project gets the edited title. */
   onTurnIntoProject: (item: Item) => void;
   onClose: () => void;
 }
@@ -138,7 +139,13 @@ function EditorForm({
             </SelectContent>
           </Select>
           {!item.projectId && (
-            <Button type="button" variant="outline" onClick={() => onTurnIntoProject(item)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                if (await onSave(item.id, details)) onTurnIntoProject(item);
+              }}
+            >
               <FolderPlus />
               Turn into project
             </Button>

@@ -8,7 +8,6 @@ export interface Project {
   /** "Done when ...", may be empty. */
   outcome: string;
   status: ProjectStatus;
-  /** "Where I left off". */
   resumeNote: string;
   /** 0-359, fixed at creation. */
   hue: number;

@@ -37,7 +37,6 @@ pub struct Project {
     /// "Done when ...", may be empty.
     pub outcome: String,
     pub status: ProjectStatus,
-    /// "Where I left off".
     pub resume_note: String,
     /// 0-359, picked from the name at creation and kept on rename.
     pub hue: u16,
