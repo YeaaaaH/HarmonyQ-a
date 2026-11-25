@@ -91,6 +91,7 @@ impl ItemRepository {
         let changed = conn.execute(
             "UPDATE items
              SET title = ?1, due_date = ?2, due_time = ?3, note = ?4, priority = ?5, updated_at = ?6,
+                 project_id = ?8,
                  reminded_at = CASE WHEN due_date IS ?2 AND due_time IS ?3 THEN reminded_at END
              WHERE id = ?7",
             params![
@@ -100,25 +101,22 @@ impl ItemRepository {
                 item.note,
                 item.priority.as_str(),
                 item.updated_at,
-                item.id
+                item.id,
+                item.project_id
             ],
         )?;
         Ok(changed)
     }
 
-    /// Ticking stamps `completed_at` with `updated_at`; unticking clears it.
-    pub fn update_status(
-        conn: &Connection,
-        id: &str,
-        status: ItemStatus,
-        updated_at: i64,
-    ) -> AppResult<usize> {
+    pub fn update_status(conn: &Connection, item: &Item) -> AppResult<usize> {
         let changed = conn.execute(
-            "UPDATE items
-             SET status = ?1, updated_at = ?2,
-                 completed_at = CASE WHEN ?1 = 'done' THEN COALESCE(completed_at, ?2) END
-             WHERE id = ?3",
-            params![status.as_str(), updated_at, id],
+            "UPDATE items SET status = ?1, completed_at = ?2, updated_at = ?3 WHERE id = ?4",
+            params![
+                item.status.as_str(),
+                item.completed_at,
+                item.updated_at,
+                item.id
+            ],
         )?;
         Ok(changed)
     }

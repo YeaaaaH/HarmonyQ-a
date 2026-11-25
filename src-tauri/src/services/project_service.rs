@@ -5,10 +5,10 @@ use crate::db::Db;
 use crate::dto::project::{CreateProjectRequest, UpdateProjectRequest};
 use crate::error::{AppError, AppResult};
 use crate::models::item::{Item, ItemStatus, Priority};
-use crate::models::project::{Project, ProjectStatus, ProjectSummary};
+use crate::models::project::{Project, ProjectStatus, ProjectSummary, TaskTurnedIntoProject};
 use crate::repositories::item_repo::ItemRepository;
 use crate::repositories::project_repo::ProjectRepository;
-use crate::utils::{id::new_id, time::now_ms};
+use crate::utils::{id::new_id, time::now_ms, validate};
 
 const MAX_NAME_LEN: usize = 200;
 const MAX_OUTCOME_LEN: usize = 500;
@@ -23,8 +23,6 @@ impl ProjectService {
         Self { db }
     }
 
-    /// Active projects first, ordered by their next step, then paused by recent activity,
-    /// then done by completion, newest first.
     pub fn list(&self) -> AppResult<Vec<ProjectSummary>> {
         let conn = self.db.lock()?;
         let mut tasks: HashMap<String, Vec<Item>> = HashMap::new();
@@ -50,7 +48,6 @@ impl ProjectService {
         find(&conn, id)
     }
 
-    /// Open tasks in next-step order, then done tasks, most recently finished first.
     pub fn list_tasks(&self, id: &str) -> AppResult<Vec<Item>> {
         let conn = self.db.lock()?;
         find(&conn, id)?;
@@ -64,11 +61,8 @@ impl ProjectService {
     }
 
     pub fn create(&self, request: CreateProjectRequest) -> AppResult<Project> {
-        let name = validate_text(&request.name, "Name", MAX_NAME_LEN)?;
-        if name.is_empty() {
-            return Err(AppError::Validation("Name must not be empty".into()));
-        }
-        let outcome = validate_text(&request.outcome, "Outcome", MAX_OUTCOME_LEN)?;
+        let name = validate::required(&request.name, "Name", MAX_NAME_LEN)?;
+        let outcome = validate::text(&request.outcome, "Outcome", MAX_OUTCOME_LEN)?;
 
         let project = new_project(name, outcome);
         let conn = self.db.lock()?;
@@ -76,29 +70,33 @@ impl ProjectService {
         Ok(project)
     }
 
-    /// Creates a project named after the task and moves the task into it as its first step.
-    pub fn create_from_task(&self, item_id: &str) -> AppResult<Project> {
+    /// Creates a project named after a loose task and moves the task into it as its first step.
+    pub fn create_from_task(&self, item_id: &str) -> AppResult<TaskTurnedIntoProject> {
         let conn = self.db.lock()?;
-        let item = ItemRepository::find(&conn, item_id)?
+        let mut task = ItemRepository::find(&conn, item_id)?
             .ok_or_else(|| AppError::NotFound(format!("Item {item_id}")))?;
-        let name: String = item.title.chars().take(MAX_NAME_LEN).collect();
+        if task.project_id.is_some() {
+            return Err(AppError::Validation(
+                "Only a task without a project can become one".into(),
+            ));
+        }
+        let name: String = task.title.chars().take(MAX_NAME_LEN).collect();
         let project = new_project(name.trim().to_string(), String::new());
+        task.project_id = Some(project.id.clone());
+        task.updated_at = project.created_at;
 
         // Both writes or neither: no empty project if moving the task fails.
         let tx = conn.unchecked_transaction()?;
         ProjectRepository::insert(&tx, &project)?;
-        ItemRepository::update_project(&tx, item_id, Some(&project.id), project.created_at)?;
+        ItemRepository::update_project(&tx, item_id, Some(&project.id), task.updated_at)?;
         tx.commit()?;
-        Ok(project)
+        Ok(TaskTurnedIntoProject { project, task })
     }
 
     pub fn update(&self, id: &str, request: UpdateProjectRequest) -> AppResult<Project> {
-        let name = validate_text(&request.name, "Name", MAX_NAME_LEN)?;
-        if name.is_empty() {
-            return Err(AppError::Validation("Name must not be empty".into()));
-        }
-        let outcome = validate_text(&request.outcome, "Outcome", MAX_OUTCOME_LEN)?;
-        let resume_note = validate_text(&request.resume_note, "Resume note", MAX_RESUME_NOTE_LEN)?;
+        let name = validate::required(&request.name, "Name", MAX_NAME_LEN)?;
+        let outcome = validate::text(&request.outcome, "Outcome", MAX_OUTCOME_LEN)?;
+        let resume_note = validate::text(&request.resume_note, "Resume note", MAX_RESUME_NOTE_LEN)?;
 
         let conn = self.db.lock()?;
         let mut project = find(&conn, id)?;
@@ -134,7 +132,7 @@ impl ProjectService {
     }
 }
 
-fn find(conn: &rusqlite::Connection, id: &str) -> AppResult<Project> {
+pub(crate) fn find(conn: &rusqlite::Connection, id: &str) -> AppResult<Project> {
     ProjectRepository::find(conn, id)?.ok_or_else(|| AppError::NotFound(format!("Project {id}")))
 }
 
@@ -158,12 +156,12 @@ fn summarize(project: Project, tasks: Vec<Item>) -> ProjectSummary {
         .iter()
         .map(|item| item.updated_at)
         .fold(project.updated_at, i64::max);
-    let (open, done): (Vec<_>, Vec<_>) = tasks
+    let is_open = |item: &Item| item.status == ItemStatus::Open;
+    let open_count = tasks.iter().filter(|item| is_open(item)).count();
+    let done_count = tasks.len() - open_count;
+    let next_step = tasks
         .into_iter()
-        .partition(|item| item.status == ItemStatus::Open);
-    let open_count = open.len();
-    let next_step = open
-        .into_iter()
+        .filter(is_open)
         .min_by(next_step_order)
         .filter(|item| item.due_date.is_some() || item.priority == Priority::High);
 
@@ -171,23 +169,21 @@ fn summarize(project: Project, tasks: Vec<Item>) -> ProjectSummary {
         project,
         next_step,
         open_count,
-        done_count: done.len(),
+        done_count,
         last_activity_at,
     }
 }
 
-/// Dated before undated, earlier first, timed before untimed, important first, oldest first.
+/// Unlike the day view, dated steps come before undated ones.
 fn next_step_order(a: &Item, b: &Item) -> Ordering {
-    let key = |item: &Item| {
+    type Key<'a> = (bool, Option<&'a str>, (bool, Option<&'a str>, bool, i64));
+    fn key(item: &Item) -> Key<'_> {
         (
             item.due_date.is_none(),
-            item.due_date.clone(),
-            item.due_time.is_none(),
-            item.due_time.clone(),
-            item.priority != Priority::High,
-            item.created_at,
+            item.due_date.as_deref(),
+            item.within_day_key(),
         )
-    };
+    }
     key(a).cmp(&key(b))
 }
 
@@ -216,16 +212,6 @@ fn hue_for(name: &str) -> u16 {
         (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
     });
     (hash % 360) as u16
-}
-
-fn validate_text(value: &str, label: &str, max: usize) -> AppResult<String> {
-    let value = value.trim();
-    if value.chars().count() > max {
-        return Err(AppError::Validation(format!(
-            "{label} must be at most {max} characters"
-        )));
-    }
-    Ok(value.to_string())
 }
 
 #[cfg(test)]
@@ -265,6 +251,7 @@ mod tests {
                     due_time: None,
                     note: String::new(),
                     priority: Priority::Normal,
+                    project_id: Some(project.id.clone()),
                 },
             )
             .unwrap()
@@ -407,9 +394,14 @@ mod tests {
             })
             .unwrap();
 
-        let project = projects.create_from_task(&item.id).unwrap();
+        let TaskTurnedIntoProject { project, task } = projects.create_from_task(&item.id).unwrap();
         assert_eq!(project.name, "Renovate the kitchen");
         assert_eq!(project.status, ProjectStatus::Active);
+        assert_eq!(task.project_id.as_deref(), Some(project.id.as_str()));
+        assert!(matches!(
+            projects.create_from_task(&item.id),
+            Err(AppError::Validation(_))
+        ));
 
         let tasks = projects.list_tasks(&project.id).unwrap();
         assert_eq!(tasks.len(), 1);

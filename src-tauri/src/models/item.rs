@@ -49,6 +49,18 @@ impl Priority {
     }
 }
 
+impl Item {
+    /// Order of tasks on the same day: timed before untimed, by time, important first, oldest first.
+    pub fn within_day_key(&self) -> (bool, Option<&str>, bool, i64) {
+        (
+            self.due_time.is_none(),
+            self.due_time.as_deref(),
+            self.priority != Priority::High,
+            self.created_at,
+        )
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TodayView {

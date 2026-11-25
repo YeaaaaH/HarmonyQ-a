@@ -6,9 +6,10 @@ use crate::db::Db;
 use crate::dto::item::{CreateItemRequest, UpdateItemRequest};
 use crate::error::{AppError, AppResult};
 use crate::models::item::{Item, ItemStatus, Priority, TodayView};
+use crate::models::project::ProjectStatus;
 use crate::repositories::item_repo::ItemRepository;
-use crate::repositories::project_repo::ProjectRepository;
-use crate::utils::{id::new_id, time::now_ms};
+use crate::services::project_service;
+use crate::utils::{id::new_id, time::now_ms, validate};
 
 const MAX_TITLE_LEN: usize = 500;
 const MAX_NOTE_LEN: usize = 5000;
@@ -58,13 +59,11 @@ impl ItemService {
     }
 
     pub fn create(&self, request: CreateItemRequest) -> AppResult<Item> {
-        let title = validate_title(&request.title)?;
+        let title = validate::required(&request.title, "Title", MAX_TITLE_LEN)?;
         let due_date = validate_date(request.due_date)?;
 
         let conn = self.db.lock()?;
-        if let Some(project_id) = &request.project_id {
-            ensure_project_exists(&conn, project_id)?;
-        }
+        ensure_project_accepts(&conn, request.project_id.as_deref(), None)?;
         let now = now_ms();
         let item = Item {
             id: new_id(),
@@ -85,53 +84,55 @@ impl ItemService {
     }
 
     pub fn update(&self, id: &str, request: UpdateItemRequest) -> AppResult<Item> {
-        let title = validate_title(&request.title)?;
+        let title = validate::required(&request.title, "Title", MAX_TITLE_LEN)?;
         let due_date = validate_date(request.due_date)?;
         let due_time = validate_time(request.due_time)?;
         if due_time.is_some() && due_date.is_none() {
             return Err(AppError::Validation("A time needs a date".into()));
         }
-        let note = request.note.trim().to_string();
-        if note.chars().count() > MAX_NOTE_LEN {
-            return Err(AppError::Validation(format!(
-                "Note must be at most {MAX_NOTE_LEN} characters"
-            )));
-        }
+        let note = validate::text(&request.note, "Note", MAX_NOTE_LEN)?;
 
         let conn = self.db.lock()?;
-        let mut item = ItemRepository::find(&conn, id)?
-            .ok_or_else(|| AppError::NotFound(format!("Item {id}")))?;
+        let mut item = find(&conn, id)?;
+        ensure_project_accepts(
+            &conn,
+            request.project_id.as_deref(),
+            item.project_id.as_deref(),
+        )?;
         item.title = title;
         item.due_date = due_date;
         item.due_time = due_time;
         item.note = note;
         item.priority = request.priority;
+        item.project_id = request.project_id;
         item.updated_at = now_ms();
 
         ItemRepository::update_details(&conn, &item)?;
         Ok(item)
     }
 
-    pub fn set_status(&self, id: &str, status: ItemStatus) -> AppResult<Item> {
+    /// Moves the task to `today`, keeping everything else.
+    pub fn schedule_today(&self, id: &str, today: NaiveDate) -> AppResult<Item> {
         let conn = self.db.lock()?;
-        let changed = ItemRepository::update_status(&conn, id, status, now_ms())?;
-        if changed == 0 {
-            return Err(AppError::NotFound(format!("Item {id}")));
-        }
-        ItemRepository::find(&conn, id)?.ok_or_else(|| AppError::NotFound(format!("Item {id}")))
+        let mut item = find(&conn, id)?;
+        item.due_date = Some(today.format("%Y-%m-%d").to_string());
+        item.updated_at = now_ms();
+        ItemRepository::update_details(&conn, &item)?;
+        Ok(item)
     }
 
-    /// `None` takes the task out of its project.
-    pub fn set_project(&self, id: &str, project_id: Option<String>) -> AppResult<Item> {
+    pub fn set_status(&self, id: &str, status: ItemStatus) -> AppResult<Item> {
         let conn = self.db.lock()?;
-        if let Some(project_id) = &project_id {
-            ensure_project_exists(&conn, project_id)?;
-        }
-        let changed = ItemRepository::update_project(&conn, id, project_id.as_deref(), now_ms())?;
-        if changed == 0 {
-            return Err(AppError::NotFound(format!("Item {id}")));
-        }
-        ItemRepository::find(&conn, id)?.ok_or_else(|| AppError::NotFound(format!("Item {id}")))
+        let mut item = find(&conn, id)?;
+        let now = now_ms();
+        item.completed_at = match status {
+            ItemStatus::Done => item.completed_at.or(Some(now)),
+            ItemStatus::Open => None,
+        };
+        item.status = status;
+        item.updated_at = now;
+        ItemRepository::update_status(&conn, &item)?;
+        Ok(item)
     }
 
     pub fn delete(&self, id: &str) -> AppResult<()> {
@@ -143,39 +144,39 @@ impl ItemService {
     }
 }
 
-fn ensure_project_exists(conn: &rusqlite::Connection, project_id: &str) -> AppResult<()> {
-    match ProjectRepository::find(conn, project_id)? {
-        Some(_) => Ok(()),
-        None => Err(AppError::NotFound(format!("Project {project_id}"))),
-    }
+fn find(conn: &rusqlite::Connection, id: &str) -> AppResult<Item> {
+    ItemRepository::find(conn, id)?.ok_or_else(|| AppError::NotFound(format!("Item {id}")))
 }
 
-/// Open before done, then earlier day, timed before untimed by time, important first, oldest first.
-fn day_order(a: &Item, b: &Item) -> Ordering {
-    let key = |item: &Item| {
-        (
-            item.status == ItemStatus::Done,
-            item.due_date.clone(),
-            item.due_time.is_none(),
-            item.due_time.clone(),
-            item.priority != Priority::High,
-            item.created_at,
-        )
+/// New tasks go only into active projects; a task may stay in its current one whatever its status.
+fn ensure_project_accepts(
+    conn: &rusqlite::Connection,
+    project_id: Option<&str>,
+    current: Option<&str>,
+) -> AppResult<()> {
+    let Some(project_id) = project_id else {
+        return Ok(());
     };
-    key(a).cmp(&key(b))
-}
-
-fn validate_title(title: &str) -> AppResult<String> {
-    let title = title.trim();
-    if title.is_empty() {
-        return Err(AppError::Validation("Title must not be empty".into()));
-    }
-    if title.chars().count() > MAX_TITLE_LEN {
+    let project = project_service::find(conn, project_id)?;
+    if project.status != ProjectStatus::Active && current != Some(project_id) {
         return Err(AppError::Validation(format!(
-            "Title must be at most {MAX_TITLE_LEN} characters"
+            "\"{}\" is not active; tasks can only go into active projects",
+            project.name
         )));
     }
-    Ok(title.to_string())
+    Ok(())
+}
+
+fn day_order(a: &Item, b: &Item) -> Ordering {
+    type Key<'a> = (bool, Option<&'a str>, (bool, Option<&'a str>, bool, i64));
+    fn key(item: &Item) -> Key<'_> {
+        (
+            item.status == ItemStatus::Done,
+            item.due_date.as_deref(),
+            item.within_day_key(),
+        )
+    }
+    key(a).cmp(&key(b))
 }
 
 /// Accepts `YYYY-MM-DD`; blank means "no date".
@@ -229,6 +230,7 @@ mod tests {
             due_time: None,
             note: String::new(),
             priority: Priority::Normal,
+            project_id: None,
         }
     }
 
@@ -289,6 +291,7 @@ mod tests {
                     due_time: Some("09:30".into()),
                     note: "  bring the card ".into(),
                     priority: Priority::High,
+                    project_id: None,
                 },
             )
             .unwrap();
@@ -361,6 +364,7 @@ mod tests {
                     due_time: time.map(Into::into),
                     note: String::new(),
                     priority,
+                    project_id: None,
                 },
             )
             .unwrap()
@@ -482,34 +486,91 @@ mod tests {
     }
 
     #[test]
-    fn tasks_move_into_and_out_of_projects_but_not_into_a_missing_one() {
+    fn update_moves_tasks_between_projects_but_not_into_missing_or_inactive_ones() {
         use crate::dto::project::CreateProjectRequest;
+        use crate::models::project::ProjectStatus;
         use crate::services::project_service::ProjectService;
 
         let db = Db::open_in_memory().unwrap();
         let items = ItemService::new(db.clone());
-        let project = ProjectService::new(db)
+        let projects = ProjectService::new(db);
+        let project = projects
             .create(CreateProjectRequest {
                 name: "Taxes".into(),
                 outcome: String::new(),
             })
             .unwrap();
         let item = items.create(request("file return")).unwrap();
+        let into = |project_id: Option<&str>| {
+            let mut req = details("file return");
+            req.project_id = project_id.map(Into::into);
+            req
+        };
 
-        let moved = items
-            .set_project(&item.id, Some(project.id.clone()))
-            .unwrap();
+        let moved = items.update(&item.id, into(Some(&project.id))).unwrap();
         assert_eq!(moved.project_id.as_deref(), Some(project.id.as_str()));
-        let out = items.set_project(&item.id, None).unwrap();
+        let out = items.update(&item.id, into(None)).unwrap();
         assert_eq!(out.project_id, None);
-
         assert!(matches!(
-            items.set_project(&item.id, Some("nope".into())),
+            items.update(&item.id, into(Some("nope"))),
             Err(AppError::NotFound(_))
         ));
-        let mut req = request("orphan");
-        req.project_id = Some("nope".into());
-        assert!(matches!(items.create(req), Err(AppError::NotFound(_))));
+
+        projects
+            .set_status(&project.id, ProjectStatus::Paused)
+            .unwrap();
+        assert!(matches!(
+            items.update(&item.id, into(Some(&project.id))),
+            Err(AppError::Validation(_))
+        ));
+        let mut req = request("new step");
+        req.project_id = Some(project.id.clone());
+        assert!(matches!(items.create(req), Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn a_task_already_in_a_paused_project_can_still_be_edited() {
+        use crate::dto::project::CreateProjectRequest;
+        use crate::models::project::ProjectStatus;
+        use crate::services::project_service::ProjectService;
+
+        let db = Db::open_in_memory().unwrap();
+        let items = ItemService::new(db.clone());
+        let projects = ProjectService::new(db);
+        let project = projects
+            .create(CreateProjectRequest {
+                name: "Taxes".into(),
+                outcome: String::new(),
+            })
+            .unwrap();
+        let mut req = request("file return");
+        req.project_id = Some(project.id.clone());
+        let item = items.create(req).unwrap();
+        projects
+            .set_status(&project.id, ProjectStatus::Paused)
+            .unwrap();
+
+        let mut edit = details("file the return");
+        edit.project_id = Some(project.id.clone());
+        assert_eq!(
+            items.update(&item.id, edit).unwrap().title,
+            "file the return"
+        );
+    }
+
+    #[test]
+    fn schedule_today_changes_only_the_date() {
+        let service = service();
+        let mut req = details("dentist");
+        req.note = "bring the card".into();
+        req.priority = Priority::High;
+        let item = service.create(request("dentist")).unwrap();
+        service.update(&item.id, req).unwrap();
+
+        let moved = service.schedule_today(&item.id, day("2026-11-25")).unwrap();
+        assert_eq!(moved.due_date.as_deref(), Some("2026-11-25"));
+        assert_eq!(moved.note, "bring the card");
+        assert_eq!(moved.priority, Priority::High);
     }
 
     #[test]
@@ -621,6 +682,7 @@ mod tests {
                     due_time: Some(time.into()),
                     note: String::new(),
                     priority: Priority::Normal,
+                    project_id: None,
                 },
             )
             .unwrap();

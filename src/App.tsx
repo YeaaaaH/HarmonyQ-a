@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AddItemForm } from "@/components/AddItemForm";
-import { ItemList } from "@/components/ItemList";
+import { ItemList, type ItemHandlers } from "@/components/ItemList";
 import { ProjectView } from "@/components/ProjectView";
+import { Section } from "@/components/Section";
 import { TaskEditor } from "@/components/TaskEditor";
 import { Sidebar } from "@/components/shell/Sidebar";
-import { VIEWS, type View } from "@/components/shell/views";
+import { VIEWS, type Screen } from "@/components/shell/views";
 import { useItems } from "@/hooks/useItems";
 import { useProjects, useProjectTasks } from "@/hooks/useProjects";
 import { useSystemTheme } from "@/hooks/useSystemTheme";
@@ -13,9 +14,10 @@ import type { Item } from "@/types/item";
 
 export default function App() {
   useSystemTheme();
-  const [view, setView] = useState<View>("today");
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const { items, error, clearError, reload, add, update, toggle, move, remove } = useItems();
+  const [screen, setScreen] = useState<Screen>({ kind: "view", view: "today" });
+  const projectId = screen.kind === "project" ? screen.id : null;
+  const { items, error, clearError, replace, add, update, scheduleToday, toggle, remove } =
+    useItems();
   const today = useToday(items);
   const {
     projects,
@@ -23,21 +25,21 @@ export default function App() {
     create: createProject,
     turnTaskIntoProject,
   } = useProjects(items);
-  const projectsById = new Map(projects.map((p) => [p.id, p]));
+  const projectsById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const projectTasks = useProjectTasks(projectId, items);
-  const project = projects.find((p) => p.id === projectId) ?? null;
+  const project = projectId ? (projectsById.get(projectId) ?? null) : null;
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = items.find((i) => i.id === editingId) ?? null;
+  const shownError = error ?? projectsError;
 
   const isOpen = (i: Item) => i.status === "open";
   const counts = {
     today: today ? today.overdue.length + today.today.filter(isOpen).length : 0,
     all: items.filter(isOpen).length,
   };
-  const title = VIEWS.find((v) => v.id === view)?.label;
 
-  const listProps = {
-    onOpen: (item: Item) => {
+  const handlers: ItemHandlers = {
+    onOpen: (item) => {
       clearError();
       setEditingId(item.id);
     },
@@ -48,66 +50,54 @@ export default function App() {
   return (
     <div className="flex h-screen">
       <Sidebar
-        active={projectId ? null : view}
+        screen={screen}
         counts={counts}
-        onSelect={(next) => {
-          setProjectId(null);
-          setView(next);
-        }}
         projects={projects}
-        activeProjectId={projectId}
-        onSelectProject={setProjectId}
+        onNavigate={setScreen}
         onCreateProject={async (name) => {
           const created = await createProject(name);
-          if (created) setProjectId(created.id);
+          if (created) setScreen({ kind: "project", id: created.id });
           return created !== null;
         }}
       />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-          {projectsError && <p className="text-sm text-destructive">{projectsError}</p>}
-          {projectId ? (
+          {shownError && !editing && <p className="text-sm text-destructive">{shownError}</p>}
+
+          {screen.kind === "project" ? (
             project && (
               <ProjectView
                 key={project.id}
                 project={project}
-                tasks={projectTasks.tasks}
-                tasksError={projectTasks.error}
-                tasksLoaded={projectTasks.loaded}
+                tasks={projectTasks}
                 today={today?.date ?? null}
                 onAdd={(title) => add(title, null, project.id)}
-                onDoToday={(item) =>
-                  today &&
-                  update(item.id, {
-                    title: item.title,
-                    dueDate: today.date,
-                    dueTime: item.dueTime,
-                    note: item.note,
-                    priority: item.priority,
-                  })
-                }
-                {...listProps}
+                onDoToday={(item) => scheduleToday(item.id)}
+                {...handlers}
               />
             )
           ) : (
             <>
               <header>
-                <h1 className="text-2xl font-semibold">{title}</h1>
-                {view === "today" && today && (
+                <h1 className="text-2xl font-semibold">
+                  {VIEWS.find((v) => v.id === screen.view)?.label}
+                </h1>
+                {screen.view === "today" && today && (
                   <p className="text-sm text-muted-foreground">{formatLongDate(today.date)}</p>
                 )}
               </header>
 
               <AddItemForm
-                onAdd={(title) => add(title, view === "today" ? (today?.date ?? null) : null)}
+                onAdd={(title) =>
+                  add(title, screen.view === "today" ? (today?.date ?? null) : null)
+                }
               />
-              {error && !editing && <p className="text-sm text-destructive">{error}</p>}
 
-              {view === "all" && (
-                <ItemList items={items} projects={projectsById} {...listProps} />
+              {screen.view === "all" && (
+                <ItemList items={items} projects={projectsById} {...handlers} />
               )}
 
-              {view === "today" && today && (
+              {screen.view === "today" && today && (
                 <>
                   {today.overdue.length > 0 && (
                     <Section title="Overdue">
@@ -115,49 +105,34 @@ export default function App() {
                         items={today.overdue}
                         overdue
                         projects={projectsById}
-                        {...listProps}
+                        {...handlers}
                       />
                     </Section>
                   )}
                   <Section title={today.overdue.length > 0 ? "Today" : undefined}>
-                    <ItemList items={today.today} projects={projectsById} {...listProps} />
+                    <ItemList items={today.today} projects={projectsById} {...handlers} />
                   </Section>
                 </>
               )}
             </>
           )}
-          {projectId && error && !editing && <p className="text-sm text-destructive">{error}</p>}
         </div>
       </main>
       <TaskEditor
         item={editing}
-        error={error ?? projectsError}
+        error={shownError}
         projects={projects}
         onSave={update}
-        onMove={move}
         onTurnIntoProject={async (item) => {
-          const created = await turnTaskIntoProject(item.id);
-          if (!created) return;
+          const result = await turnTaskIntoProject(item.id);
+          if (!result) return;
+          replace(result.task);
           setEditingId(null);
-          setProjectId(created.id);
-          await reload();
+          setScreen({ kind: "project", id: result.project.id });
         }}
         onClose={() => setEditingId(null)}
       />
     </div>
-  );
-}
-
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      {title && (
-        <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {title}
-        </h2>
-      )}
-      {children}
-    </section>
   );
 }
 

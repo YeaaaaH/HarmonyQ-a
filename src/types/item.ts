@@ -25,6 +25,7 @@ export interface ItemDetails {
   dueTime: string | null;
   note: string;
   priority: Priority;
+  projectId: string | null;
 }
 
 export interface TodayView {

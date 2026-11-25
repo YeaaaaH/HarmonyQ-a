@@ -1,20 +1,23 @@
 import { CalendarDays, Clock, Flag, StickyNote, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { projectColor } from "@/lib/projectColor";
+import { ProjectDot } from "@/components/ProjectDot";
 import { cn } from "@/lib/utils";
 import type { Item } from "@/types/item";
 import type { ProjectSummary } from "@/types/project";
 
-interface Props {
+export interface ItemHandlers {
+  onOpen: (item: Item) => void;
+  onToggle: (item: Item) => void;
+  onRemove: (id: string) => void;
+}
+
+interface Props extends ItemHandlers {
   items: Item[];
   /** Marks the dates as overdue. */
   overdue?: boolean;
   /** When given, each task shows its project's color and name. */
   projects?: Map<string, ProjectSummary>;
-  onOpen: (item: Item) => void;
-  onToggle: (item: Item) => void;
-  onRemove: (id: string) => void;
 }
 
 export function ItemList({
@@ -83,10 +86,7 @@ export function ItemMeta({
     <span className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground [&_svg]:size-3.5">
       {project && (
         <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: projectColor(project.hue) }}
-          />
+          <ProjectDot hue={project.hue} className="size-2" />
           <span className="truncate">{project.name}</span>
         </span>
       )}

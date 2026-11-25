@@ -19,7 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { projectColor } from "@/lib/projectColor";
+import { ProjectDot } from "@/components/ProjectDot";
 import { cn } from "@/lib/utils";
 import type { Item, ItemDetails } from "@/types/item";
 import type { ProjectSummary } from "@/types/project";
@@ -32,7 +32,6 @@ interface Props {
   error: string | null;
   projects: ProjectSummary[];
   onSave: (id: string, details: ItemDetails) => Promise<boolean>;
-  onMove: (id: string, projectId: string | null) => Promise<boolean>;
   /** Called after the form is saved, so the project gets the edited title. */
   onTurnIntoProject: (item: Item) => void;
   onClose: () => void;
@@ -60,7 +59,6 @@ function EditorForm({
   error,
   projects,
   onSave,
-  onMove,
   onTurnIntoProject,
   onClose,
 }: Props & { item: Item }) {
@@ -70,8 +68,8 @@ function EditorForm({
     dueTime: item.dueTime,
     note: item.note,
     priority: item.priority,
+    projectId: item.projectId,
   });
-  const [projectId, setProjectId] = useState(item.projectId);
   const set = (patch: Partial<ItemDetails>) => setDetails((d) => ({ ...d, ...patch }));
   const high = details.priority === "high";
   // Paused or done projects are hidden, except the one the task is already in.
@@ -79,9 +77,7 @@ function EditorForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!(await onSave(item.id, details))) return;
-    if (projectId !== item.projectId && !(await onMove(item.id, projectId))) return;
-    onClose();
+    if (await onSave(item.id, details)) onClose();
   };
 
   return (
@@ -119,8 +115,8 @@ function EditorForm({
       <Field label="Project">
         <div className="flex gap-2">
           <Select
-            value={projectId ?? NO_PROJECT}
-            onValueChange={(value) => setProjectId(value === NO_PROJECT ? null : value)}
+            value={details.projectId ?? NO_PROJECT}
+            onValueChange={(value) => set({ projectId: value === NO_PROJECT ? null : value })}
           >
             <SelectTrigger className="min-w-0 flex-1">
               <SelectValue />
@@ -129,16 +125,13 @@ function EditorForm({
               <SelectItem value={NO_PROJECT}>No project</SelectItem>
               {choices.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: projectColor(project.hue) }}
-                  />
+                  <ProjectDot hue={project.hue} />
                   {project.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {!item.projectId && (
+          {!item.projectId && !details.projectId && (
             <Button
               type="button"
               variant="outline"

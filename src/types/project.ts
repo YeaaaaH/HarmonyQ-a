@@ -16,6 +16,11 @@ export interface Project {
   completedAt: number | null;
 }
 
+export interface TaskTurnedIntoProject {
+  project: Project;
+  task: Item;
+}
+
 export interface ProjectSummary extends Project {
   /** First open task with a date or high priority; null when none has one. With openCount 0 the project needs a next step. */
   nextStep: Item | null;

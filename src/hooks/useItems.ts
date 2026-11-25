@@ -1,67 +1,49 @@
 import { useCallback, useEffect, useState } from "react";
+import { useAction } from "@/hooks/useAction";
 import * as api from "@/lib/api/items";
 import type { Item, ItemDetails } from "@/types/item";
 
 export function useItems() {
   const [items, setItems] = useState<Item[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { error, clearError, run } = useAction();
 
-  const run = useCallback(async (action: () => Promise<void>): Promise<boolean> => {
-    try {
-      setError(null);
-      await action();
-      return true;
-    } catch (e) {
-      setError(String(e));
-      return false;
-    }
-  }, []);
-
-  const reload = useCallback(
-    () => run(async () => setItems(await api.listItems())),
+  const attempt = useCallback(
+    async (action: () => Promise<void>) => (await run(action)) !== null,
     [run],
   );
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    attempt(async () => setItems(await api.listItems()));
+  }, [attempt]);
 
-  const replace = (updated: Item) =>
-    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+  const replace = useCallback(
+    (updated: Item) => setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i))),
+    [],
+  );
 
   const add = (title: string, dueDate: string | null = null, projectId: string | null = null) =>
-    run(async () => {
+    attempt(async () => {
       const created = await api.createItem(title, dueDate, projectId);
       setItems((prev) => [created, ...prev]);
     });
 
   const update = (id: string, details: ItemDetails) =>
-    run(async () => replace(await api.updateItem(id, details)));
+    attempt(async () => replace(await api.updateItem(id, details)));
+
+  const scheduleToday = (id: string) =>
+    attempt(async () => replace(await api.scheduleItemToday(id)));
 
   const toggle = (item: Item) =>
-    run(async () => {
+    attempt(async () => {
       const next = item.status === "open" ? "done" : "open";
       replace(await api.setItemStatus(item.id, next));
     });
 
-  const move = (id: string, projectId: string | null) =>
-    run(async () => replace(await api.setItemProject(id, projectId)));
-
   const remove = (id: string) =>
-    run(async () => {
+    attempt(async () => {
       await api.deleteItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
     });
 
-  return {
-    items,
-    error,
-    clearError: () => setError(null),
-    reload,
-    add,
-    update,
-    toggle,
-    move,
-    remove,
-  };
+  return { items, error, clearError, replace, add, update, scheduleToday, toggle, remove };
 }

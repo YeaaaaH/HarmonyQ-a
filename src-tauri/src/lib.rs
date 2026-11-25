@@ -33,7 +33,7 @@ pub fn run() {
             commands::items::create_item,
             commands::items::update_item,
             commands::items::set_item_status,
-            commands::items::set_item_project,
+            commands::items::schedule_item_today,
             commands::items::delete_item,
             commands::projects::list_projects,
             commands::projects::get_project,
