@@ -1,48 +1,50 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAction } from "@/hooks/useAction";
 import * as api from "@/lib/api/projects";
 import type { Item } from "@/types/item";
-import type { Project, ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/types/project";
 
 /** Re-reads the summaries whenever `items` change: next steps and counts depend on them. */
 export function useProjects(items: Item[]) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { error, setError, run } = useAction();
+  const latest = useRef(0);
 
-  const refresh = useCallback(
-    () => api.listProjects().then(setProjects, (e) => setError(String(e))),
-    [],
-  );
+  const refresh = useCallback(async () => {
+    // Refreshes can overlap; only the newest answer may land.
+    const request = ++latest.current;
+    try {
+      const list = await api.listProjects();
+      if (request !== latest.current) return;
+      setProjects(list);
+      setError(null);
+    } catch (e) {
+      if (request === latest.current) setError(String(e));
+    }
+  }, [setError]);
 
   useEffect(() => {
     refresh();
   }, [items, refresh]);
 
-  const create = async (name: string): Promise<Project | null> => {
-    try {
-      setError(null);
+  const create = (name: string) =>
+    run(async () => {
       const project = await api.createProject(name);
       await refresh();
       return project;
-    } catch (e) {
-      setError(String(e));
-      return null;
-    }
-  };
+    });
 
-  const turnTaskIntoProject = async (itemId: string): Promise<Project | null> => {
-    try {
-      setError(null);
-      return await api.turnTaskIntoProject(itemId);
-    } catch (e) {
-      setError(String(e));
-      return null;
-    }
-  };
+  const turnTaskIntoProject = (itemId: string) =>
+    run(async () => {
+      const result = await api.turnTaskIntoProject(itemId);
+      await refresh();
+      return result;
+    });
 
   return { projects, error, create, turnTaskIntoProject };
 }
 
-interface ProjectTasks {
+export interface ProjectTasks {
   tasks: Item[];
   error: string | null;
   /** False until the first answer for this project arrives. */

@@ -42,12 +42,10 @@ pub async fn set_item_status(
 }
 
 #[tauri::command]
-pub async fn set_item_project(
-    state: State<'_, AppState>,
-    id: String,
-    project_id: Option<String>,
-) -> Result<Item, AppError> {
-    state.items.set_project(&id, project_id)
+pub async fn schedule_item_today(state: State<'_, AppState>, id: String) -> Result<Item, AppError> {
+    state
+        .items
+        .schedule_today(&id, chrono::Local::now().date_naive())
 }
 
 #[tauri::command]

@@ -1,48 +1,36 @@
 import { useState } from "react";
 import { Check, ChevronDown, ChevronRight, Sun, Trash2 } from "lucide-react";
 import { AddItemForm } from "@/components/AddItemForm";
-import { ItemList, ItemMeta } from "@/components/ItemList";
+import { ItemList, ItemMeta, type ItemHandlers } from "@/components/ItemList";
+import { ProjectDot } from "@/components/ProjectDot";
+import { sectionHeading } from "@/components/Section";
 import { Button } from "@/components/ui/button";
+import type { ProjectTasks } from "@/hooks/useProjects";
 import { projectColor } from "@/lib/projectColor";
 import { cn } from "@/lib/utils";
 import type { Item } from "@/types/item";
 import type { ProjectSummary } from "@/types/project";
 
-interface Props {
+interface Props extends ItemHandlers {
   project: ProjectSummary;
-  /** Open tasks in next-step order, then done ones (backend order). */
-  tasks: Item[];
-  tasksError: string | null;
-  tasksLoaded: boolean;
+  tasks: ProjectTasks;
   /** Today's local date, `YYYY-MM-DD`, once known. */
   today: string | null;
   onAdd: (title: string) => Promise<boolean>;
   onDoToday: (item: Item) => void;
-  onOpen: (item: Item) => void;
-  onToggle: (item: Item) => void;
-  onRemove: (id: string) => void;
 }
 
-export function ProjectView({
-  project,
-  tasks,
-  tasksError,
-  tasksLoaded,
-  today,
-  onAdd,
-  onDoToday,
-  ...listProps
-}: Props) {
+export function ProjectView({ project, tasks, today, onAdd, onDoToday, ...handlers }: Props) {
   const [showDone, setShowDone] = useState(false);
-  const open = tasks.filter((t) => t.status === "open");
-  const done = tasks.filter((t) => t.status === "done");
+  const open = tasks.tasks.filter((t) => t.status === "open");
+  const done = tasks.tasks.filter((t) => t.status === "done");
   const color = projectColor(project.hue);
 
   return (
     <>
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-3 text-2xl font-semibold">
-          <span className="size-3.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+          <ProjectDot hue={project.hue} className="size-3.5" />
           <span className="min-w-0 truncate">{project.name}</span>
         </h1>
         {project.outcome && (
@@ -52,19 +40,19 @@ export function ProjectView({
 
       <AddItemForm onAdd={onAdd} placeholder="Add a step" />
 
-      {tasksError && <p className="text-sm text-destructive">{tasksError}</p>}
+      {tasks.error && <p className="text-sm text-destructive">{tasks.error}</p>}
 
       <ol className="flex flex-col gap-3 pt-1">
-        {tasksLoaded && !tasksError && open.length === 0 && <EmptyStep />}
-        {open.map((step, index) => (
+        {tasks.loaded && !tasks.error && open.length === 0 && <EmptyStep />}
+        {open.map((step) => (
           <Step
             key={step.id}
             step={step}
-            next={index === 0 && project.nextStep?.id === step.id}
+            next={project.nextStep?.id === step.id}
             color={color}
             today={today}
             onDoToday={onDoToday}
-            {...listProps}
+            {...handlers}
           />
         ))}
       </ol>
@@ -73,12 +61,12 @@ export function ProjectView({
         <section className="flex flex-col gap-2">
           <button
             onClick={() => setShowDone((v) => !v)}
-            className="flex items-center gap-1 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground [&_svg]:size-3.5"
+            className={cn(sectionHeading, "flex items-center gap-1 hover:text-foreground [&_svg]:size-3.5")}
           >
             {showDone ? <ChevronDown /> : <ChevronRight />}
             Done ({done.length})
           </button>
-          {showDone && <ItemList items={done} {...listProps} />}
+          {showDone && <ItemList items={done} {...handlers} />}
         </section>
       )}
     </>
@@ -94,15 +82,12 @@ function Step({
   onOpen,
   onToggle,
   onRemove,
-}: {
+}: ItemHandlers & {
   step: Item;
   next: boolean;
   color: string;
   today: string | null;
   onDoToday: (item: Item) => void;
-  onOpen: (item: Item) => void;
-  onToggle: (item: Item) => void;
-  onRemove: (id: string) => void;
 }) {
   const overdue = today !== null && step.dueDate !== null && step.dueDate < today;
 

@@ -17,7 +17,6 @@ export const updateItem = (id: string, details: ItemDetails) =>
 export const setItemStatus = (id: string, status: ItemStatus) =>
   invoke<Item>("set_item_status", { id, status });
 
-export const setItemProject = (id: string, projectId: string | null) =>
-  invoke<Item>("set_item_project", { id, projectId });
+export const scheduleItemToday = (id: string) => invoke<Item>("schedule_item_today", { id });
 
 export const deleteItem = (id: string) => invoke<void>("delete_item", { id });

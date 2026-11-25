@@ -2,30 +2,21 @@ import { useState, type KeyboardEvent } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { projectColor } from "@/lib/projectColor";
+import { ProjectDot } from "@/components/ProjectDot";
+import { sectionHeading } from "@/components/Section";
 import { cn } from "@/lib/utils";
 import type { ProjectSummary } from "@/types/project";
-import { VIEWS, type View } from "./views";
+import { VIEWS, type Screen, type View } from "./views";
 
 interface Props {
-  active: View | null;
+  screen: Screen;
   counts: Partial<Record<View, number>>;
-  onSelect: (view: View) => void;
   projects: ProjectSummary[];
-  activeProjectId: string | null;
-  onSelectProject: (id: string) => void;
+  onNavigate: (screen: Screen) => void;
   onCreateProject: (name: string) => Promise<boolean>;
 }
 
-export function Sidebar({
-  active,
-  counts,
-  onSelect,
-  projects,
-  activeProjectId,
-  onSelectProject,
-  onCreateProject,
-}: Props) {
+export function Sidebar({ screen, counts, projects, onNavigate, onCreateProject }: Props) {
   const [creating, setCreating] = useState(false);
   const activeProjects = projects.filter((p) => p.status === "active");
 
@@ -36,9 +27,9 @@ export function Sidebar({
         {VIEWS.map(({ id, label, icon: Icon }) => (
           <NavButton
             key={id}
-            selected={active === id}
+            selected={screen.kind === "view" && screen.view === id}
             count={counts[id]}
-            onClick={() => onSelect(id)}
+            onClick={() => onNavigate({ kind: "view", view: id })}
           >
             <Icon className="size-4" />
             <span className="flex-1 truncate text-left">{label}</span>
@@ -48,9 +39,7 @@ export function Sidebar({
 
       <section className="flex min-h-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between px-2">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Projects
-          </h2>
+          <h2 className={sectionHeading}>Projects</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -73,14 +62,11 @@ export function Sidebar({
           {activeProjects.map((project) => (
             <NavButton
               key={project.id}
-              selected={activeProjectId === project.id}
+              selected={screen.kind === "project" && screen.id === project.id}
               count={project.openCount}
-              onClick={() => onSelectProject(project.id)}
+              onClick={() => onNavigate({ kind: "project", id: project.id })}
             >
-              <span
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: projectColor(project.hue) }}
-              />
+              <ProjectDot hue={project.hue} />
               <span className="flex-1 truncate text-left">{project.name}</span>
             </NavButton>
           ))}

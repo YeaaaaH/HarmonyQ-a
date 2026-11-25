@@ -21,4 +21,5 @@ pub struct UpdateItemRequest {
     pub due_time: Option<String>,
     pub note: String,
     pub priority: Priority,
+    pub project_id: Option<String>,
 }

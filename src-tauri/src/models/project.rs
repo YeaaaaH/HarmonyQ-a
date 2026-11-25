@@ -47,12 +47,17 @@ pub struct Project {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TaskTurnedIntoProject {
+    pub project: Project,
+    pub task: Item,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectSummary {
     #[serde(flatten)]
     pub project: Project,
-    /// First open task by date, time, priority, age, but only if it has a date or is important:
-    /// picking the oldest of undated tasks would look like a choice that was never made.
-    /// `None` with `open_count == 0` means "needs a next step".
+    /// Only a task with a date or high priority: "the oldest undated task" would be a fake choice.
     pub next_step: Option<Item>,
     pub open_count: usize,
     pub done_count: usize,

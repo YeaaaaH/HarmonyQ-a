@@ -3,7 +3,7 @@ use tauri::State;
 use crate::dto::project::{CreateProjectRequest, UpdateProjectRequest};
 use crate::error::AppError;
 use crate::models::item::Item;
-use crate::models::project::{Project, ProjectStatus, ProjectSummary};
+use crate::models::project::{Project, ProjectStatus, ProjectSummary, TaskTurnedIntoProject};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -36,7 +36,7 @@ pub async fn create_project(
 pub async fn turn_task_into_project(
     state: State<'_, AppState>,
     item_id: String,
-) -> Result<Project, AppError> {
+) -> Result<TaskTurnedIntoProject, AppError> {
     state.projects.create_from_task(&item_id)
 }
 
